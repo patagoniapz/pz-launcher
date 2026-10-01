@@ -16,8 +16,18 @@ you drop **inside the game folder** (e.g.
    downloads only what changed.
 4. Starts the game.
 
-Progress is shown in a small **native window** (falls back to console if no GUI
-is available). On Windows it carries the Project Zomboid icon.
+Progress is shown in a small **native window** with an **estimated time left**
+(falls back to console if no GUI is available). On Windows it carries the
+Project Zomboid icon.
+
+It does **not** auto-launch: after updating it asks **Play / Clean logs & play /
+Quit**. The game is started **through Steam** (`steam://rungameid/108600`), which
+boots Steam if it is closed. "Clean logs" wipes `%UserProfile%\Zomboid\Logs\` and
+the `*console.txt` files (never your saves or mods).
+
+The Zomboid data folder is autodetected at `%UserProfile%\Zomboid` (`~/Zomboid`).
+Override it with the `PZL_ZOMBOID_DIR` env var or a `pzlauncher.json` next to the
+executable: `{ "zomboid_dir": "D:\\otra\\ruta\\Zomboid" }`.
 
 ### Get it
 
@@ -53,8 +63,18 @@ ejecutable que se deja **dentro de la carpeta del juego** (p. ej.
    y descarga solo lo que haya cambiado.
 4. Arranca el juego.
 
-El progreso se muestra en una pequeña **ventana nativa** (si no hay entorno
-gráfico, cae a consola). En Windows lleva el icono de Project Zomboid.
+El progreso se muestra en una pequeña **ventana nativa** con **tiempo estimado
+restante** (si no hay entorno gráfico, cae a consola). En Windows lleva el icono
+de Project Zomboid.
+
+**No** arranca el juego solo: tras actualizar pregunta **Jugar / Limpiar logs y
+jugar / Salir**. El juego se lanza **vía Steam** (`steam://rungameid/108600`), que
+abre Steam si está cerrado. "Limpiar logs" borra `%UserProfile%\Zomboid\Logs\` y
+los `*console.txt` (nunca tus partidas ni mods).
+
+La carpeta de datos de Zomboid se autodetecta en `%UserProfile%\Zomboid`
+(`~/Zomboid`). Puedes cambiarla con la variable `PZL_ZOMBOID_DIR` o con un
+`pzlauncher.json` junto al ejecutable: `{ "zomboid_dir": "D:\\otra\\ruta\\Zomboid" }`.
 
 ### Cómo obtenerlo
 

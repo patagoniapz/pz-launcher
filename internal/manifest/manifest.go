@@ -31,6 +31,11 @@ type Manifest struct {
 
 	// Launch indica cómo arrancar el juego por SO (clave = runtime.GOOS).
 	Launch map[string]LaunchSpec `json:"launch"`
+
+	// SteamAppID, si es > 0, hace que el juego se lance vía Steam
+	// (steam://rungameid/<id>), lo que arranca Steam si está cerrado.
+	// Project Zomboid es 108600. Si es 0, se usa el ejecutable de Launch.
+	SteamAppID int `json:"steam_appid,omitempty"`
 }
 
 // Asset es un fichero descargable con su hash de verificación.

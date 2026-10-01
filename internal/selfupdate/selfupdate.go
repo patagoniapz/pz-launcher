@@ -54,7 +54,11 @@ func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter) (relaunc
 	exe, _ = filepath.EvalSymlinks(exe)
 	dir := filepath.Dir(exe)
 
-	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256, rep.Progress)
+	var done int64
+	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256, func(n int64) {
+		done += n
+		rep.Progress(done, asset.Size)
+	})
 	if err != nil {
 		return false, err
 	}

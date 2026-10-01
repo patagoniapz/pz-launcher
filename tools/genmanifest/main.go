@@ -50,6 +50,7 @@ func main() {
 		launchWin  = flag.String("launch-windows", "ProjectZomboid64.exe", "ejecutable del juego en Windows")
 		launchLin  = flag.String("launch-linux", "./ProjectZomboid64", "ejecutable del juego en Linux")
 		launchMac  = flag.String("launch-darwin", "./ProjectZomboid64", "ejecutable del juego en macOS")
+		steamAppID = flag.Int("steam-appid", 108600, "AppID de Steam (0 = lanzar el exe en vez de vía Steam)")
 	)
 	flag.Var(&gameFiles, "game", "fichero del juego: rutaRelativa=ficheroLocal (repetible)")
 	flag.Var(&binFiles, "bin", "binario del launcher: GOOS/GOARCH=ficheroLocal (repetible)")
@@ -69,6 +70,7 @@ func main() {
 			"linux":   {Exe: *launchLin},
 			"darwin":  {Exe: *launchMac},
 		},
+		SteamAppID: *steamAppID,
 	}
 
 	for _, entry := range gameFiles {

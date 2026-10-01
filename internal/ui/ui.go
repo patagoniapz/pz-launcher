@@ -4,12 +4,64 @@
 package ui
 
 import (
+	"errors"
 	"log"
 
 	"github.com/ncruces/zenity"
 )
 
 const appTitle = "PZ Launcher"
+
+// Action es la elección del usuario en el diálogo posterior a la actualización.
+type Action int
+
+const (
+	// ActionQuit: salir sin arrancar el juego.
+	ActionQuit Action = iota
+	// ActionPlay: arrancar el juego.
+	ActionPlay
+	// ActionCleanAndPlay: limpiar los logs y luego arrancar el juego.
+	ActionCleanAndPlay
+)
+
+// AskAction muestra un diálogo con tres opciones (Jugar / Limpiar logs y jugar /
+// Salir) y devuelve la elección. Si no hay entorno gráfico, arranca el juego
+// por defecto (ActionPlay).
+func AskAction(text string) Action {
+	err := zenity.Question(text,
+		zenity.Title(appTitle),
+		zenity.OKLabel("Jugar"),
+		zenity.ExtraButton("Limpiar logs y jugar"),
+		zenity.CancelLabel("Salir"),
+	)
+	switch {
+	case err == nil:
+		return ActionPlay
+	case errors.Is(err, zenity.ErrExtraButton):
+		return ActionCleanAndPlay
+	case errors.Is(err, zenity.ErrCanceled):
+		return ActionQuit
+	default:
+		// Sin GUI disponible (p. ej. consola): comportamiento por defecto.
+		return ActionPlay
+	}
+}
+
+// PickFolder abre un selector de carpeta. Devuelve la ruta y true si el usuario
+// eligió una; false si canceló o no hay entorno gráfico.
+func PickFolder(title string) (string, bool) {
+	dir, err := zenity.SelectFile(zenity.Directory(), zenity.Title(title))
+	if err != nil || dir == "" {
+		return "", false
+	}
+	return dir, true
+}
+
+// Info muestra un aviso informativo nativo (y lo registra por consola).
+func Info(msg string) {
+	log.Println(msg)
+	_ = zenity.Info(msg, zenity.Title(appTitle), zenity.InfoIcon)
+}
 
 // Reporter recibe las actualizaciones de estado del launcher.
 type Reporter interface {

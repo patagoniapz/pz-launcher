@@ -1,4 +1,7 @@
 /dist/
+/devtest/www/
+/devtest/game/
+/devtest/fakezomboid/
 *.old
 *.new
 *.bak

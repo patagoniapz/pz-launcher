@@ -21,9 +21,10 @@ import (
 // SHA-256 coincide con wantHash y devuelve la ruta del temporal. El llamante es
 // responsable de moverlo a su destino (os.Rename) y de borrarlo si algo falla.
 //
-// onProgress, si no es nil, se llama durante la descarga con los bytes recibidos
-// y el total esperado (total es -1 si el servidor no lo informa).
-func Verified(url, dir, wantHash string, onProgress func(done, total int64)) (string, error) {
+// onChunk, si no es nil, se llama en cada bloque recibido con el número de bytes
+// de ese bloque (incremento), para poder agregar el progreso entre varios
+// ficheros y estimar el tiempo restante.
+func Verified(url, dir, wantHash string, onChunk func(n int64)) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -43,8 +44,8 @@ func Verified(url, dir, wantHash string, onProgress func(done, total int64)) (st
 
 	h := sha256.New()
 	dst := io.Writer(io.MultiWriter(tmp, h))
-	if onProgress != nil {
-		dst = io.MultiWriter(tmp, h, &progressWriter{total: resp.ContentLength, onProgress: onProgress})
+	if onChunk != nil {
+		dst = io.MultiWriter(tmp, h, &progressWriter{onChunk: onChunk})
 	}
 	if _, err := io.Copy(dst, resp.Body); err != nil {
 		tmp.Close()
@@ -66,16 +67,13 @@ func Verified(url, dir, wantHash string, onProgress func(done, total int64)) (st
 	return tmpPath, nil
 }
 
-// progressWriter cuenta los bytes escritos y los reporta vía onProgress.
+// progressWriter reporta cada bloque escrito (incremento en bytes) vía onChunk.
 type progressWriter struct {
-	done       int64
-	total      int64
-	onProgress func(done, total int64)
+	onChunk func(n int64)
 }
 
 func (p *progressWriter) Write(b []byte) (int, error) {
 	n := len(b)
-	p.done += int64(n)
-	p.onProgress(p.done, p.total)
+	p.onChunk(int64(n))
 	return n, nil
 }
