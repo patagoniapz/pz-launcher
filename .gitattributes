@@ -6,3 +6,5 @@
 *.jar binary
 *.exe binary
 *.png binary
+*.ico binary
+*.syso binary
