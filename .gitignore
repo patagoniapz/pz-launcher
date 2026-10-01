@@ -1,0 +1,6 @@
+/dist/
+*.old
+*.new
+*.bak
+*.exe
+!payload/*.exe
