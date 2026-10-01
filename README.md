@@ -20,10 +20,14 @@ Progress is shown in a small **native window** with an **estimated time left**
 (falls back to console if no GUI is available). On Windows it carries the
 Project Zomboid icon.
 
-It does **not** auto-launch: after updating it asks **Play / Clean logs & play /
-Quit**. The game is started **through Steam** (`steam://rungameid/108600`), which
-boots Steam if it is closed. "Clean logs" wipes `%UserProfile%\Zomboid\Logs\` and
-the `*console.txt` files (never your saves or mods).
+It does **not** auto-launch: after updating it asks **Play / Clean logs / Quit**.
+"Clean logs" only cleans (it does not start the game) and re-shows the dialog.
+The game is started **through Steam** (`steam://rungameid/108600`), which boots
+Steam if it is closed. "Clean logs" wipes `%UserProfile%\Zomboid\Logs\` and the
+`*console.txt` files (never your saves or mods).
+
+Downloads are resilient to flaky connections: a stalled transfer is detected and
+automatically retried.
 
 The Zomboid data folder is autodetected at `%UserProfile%\Zomboid` (`~/Zomboid`).
 Override it with the `PZL_ZOMBOID_DIR` env var or a `pzlauncher.json` next to the
@@ -67,10 +71,14 @@ El progreso se muestra en una pequeña **ventana nativa** con **tiempo estimado
 restante** (si no hay entorno gráfico, cae a consola). En Windows lleva el icono
 de Project Zomboid.
 
-**No** arranca el juego solo: tras actualizar pregunta **Jugar / Limpiar logs y
-jugar / Salir**. El juego se lanza **vía Steam** (`steam://rungameid/108600`), que
-abre Steam si está cerrado. "Limpiar logs" borra `%UserProfile%\Zomboid\Logs\` y
-los `*console.txt` (nunca tus partidas ni mods).
+**No** arranca el juego solo: tras actualizar pregunta **Jugar / Limpiar logs /
+Salir**. "Limpiar logs" solo limpia (no arranca el juego) y vuelve a mostrar el
+diálogo. El juego se lanza **vía Steam** (`steam://rungameid/108600`), que abre
+Steam si está cerrado. "Limpiar logs" borra `%UserProfile%\Zomboid\Logs\` y los
+`*console.txt` (nunca tus partidas ni mods).
+
+Las descargas toleran conexiones inestables: si la transferencia se queda parada,
+se detecta y se reintenta automáticamente.
 
 La carpeta de datos de Zomboid se autodetecta en `%UserProfile%\Zomboid`
 (`~/Zomboid`). Puedes cambiarla con la variable `PZL_ZOMBOID_DIR` o con un

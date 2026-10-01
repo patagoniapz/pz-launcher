@@ -14,6 +14,7 @@
 package selfupdate
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"pzlauncher/internal/download"
 	"pzlauncher/internal/manifest"
@@ -54,11 +56,10 @@ func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter) (relaunc
 	exe, _ = filepath.EvalSymlinks(exe)
 	dir := filepath.Dir(exe)
 
-	var done int64
-	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256, func(n int64) {
-		done += n
-		rep.Progress(done, asset.Size)
-	})
+	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256,
+		func(fileDone int64) { rep.Progress(fileDone, asset.Size) },
+		func(msg string) { rep.Stage(msg) },
+	)
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +96,21 @@ func CleanupOld() {
 		return
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
-	_ = os.Remove(exe + ".old")
+	old := exe + ".old"
+
+	// Si no hay ".old", no hay nada que hacer (caso normal, retorno inmediato).
+	if _, err := os.Stat(old); errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	// Tras una autoactualización, el proceso anterior sale en milisegundos y
+	// libera el ".old". Reintentamos un poco para borrarlo cuanto antes y no
+	// dejar ningún backup.
+	for i := 0; i < 20; i++ {
+		if os.Remove(old) == nil {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // isNewer devuelve true si a es una versión semver estrictamente mayor que b.

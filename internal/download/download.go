@@ -1,13 +1,20 @@
 // Package download descarga ficheros a una ruta temporal verificando su
-// hash SHA-256 ANTES de que el llamante los mueva a su destino final.
+// SHA-256 ANTES de que el llamante los mueva a su destino final.
 //
-// Descargar a un temporal y verificar primero evita dejar un fichero del juego
-// a medio escribir o corrupto si la descarga falla o la red se corta.
+// Para tolerar conexiones inestables:
+//   - Un "vigilante de cuelgue": si no llegan datos durante stallTimeout, se
+//     cancela la petición (en vez de quedarse esperando indefinidamente).
+//   - Reintentos automáticos con espera creciente ante errores de red.
+//
+// Un hash que no coincide NO se reintenta: significa que el fichero del servidor
+// es otro, no un corte de red.
 package download
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,21 +24,54 @@ import (
 	"time"
 )
 
+const (
+	maxAttempts  = 4
+	stallTimeout = 20 * time.Second
+)
+
+var errHashMismatch = errors.New("el hash no coincide")
+
 // Verified descarga url en un fichero temporal dentro de dir, comprueba que su
 // SHA-256 coincide con wantHash y devuelve la ruta del temporal. El llamante es
 // responsable de moverlo a su destino (os.Rename) y de borrarlo si algo falla.
 //
-// onChunk, si no es nil, se llama en cada bloque recibido con el número de bytes
-// de ese bloque (incremento), para poder agregar el progreso entre varios
-// ficheros y estimar el tiempo restante.
-func Verified(url, dir, wantHash string, onChunk func(n int64)) (string, error) {
-	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Get(url)
+// onProgress (si no es nil) recibe los bytes acumulados de ESTE fichero; se
+// reinicia a 0 si una descarga se reintenta desde cero.
+// onEvent (si no es nil) recibe mensajes de estado (p. ej. reintentos).
+func Verified(url, dir, wantHash string, onProgress func(fileDone int64), onEvent func(msg string)) (string, error) {
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if attempt > 1 && onEvent != nil {
+			onEvent(fmt.Sprintf("Conexión interrumpida; reintentando (%d/%d)…", attempt, maxAttempts))
+		}
+		path, err := downloadOnce(url, dir, wantHash, onProgress)
+		if err == nil {
+			return path, nil
+		}
+		lastErr = err
+		if errors.Is(err, errHashMismatch) {
+			return "", err // fichero equivocado: no tiene sentido reintentar
+		}
+		if attempt < maxAttempts {
+			time.Sleep(time.Duration(attempt) * time.Second) // espera creciente
+		}
+	}
+	return "", fmt.Errorf("tras %d intentos: %w", maxAttempts, lastErr)
+}
+
+func downloadOnce(url, dir, wantHash string, onProgress func(fileDone int64)) (string, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("descargando %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("descargando %s: HTTP %d", url, resp.StatusCode)
 	}
@@ -42,38 +82,56 @@ func Verified(url, dir, wantHash string, onChunk func(n int64)) (string, error) 
 	}
 	tmpPath := tmp.Name()
 
+	// Vigilante: si no llegan datos durante stallTimeout, cancela el contexto
+	// para que el io.Copy falle y se dispare un reintento.
+	stall := time.AfterFunc(stallTimeout, cancel)
+
 	h := sha256.New()
-	dst := io.Writer(io.MultiWriter(tmp, h))
-	if onChunk != nil {
-		dst = io.MultiWriter(tmp, h, &progressWriter{onChunk: onChunk})
+	pw := &progressWriter{
+		onProgress: onProgress,
+		onData:     func() { stall.Reset(stallTimeout) },
 	}
-	if _, err := io.Copy(dst, resp.Body); err != nil {
-		tmp.Close()
+	_, copyErr := io.Copy(io.MultiWriter(tmp, h, pw), resp.Body)
+	stall.Stop()
+	closeErr := tmp.Close()
+
+	if copyErr != nil {
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("guardando descarga: %w", err)
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("descarga de %s detenida: sin datos durante %s", filepath.Base(url), stallTimeout)
+		}
+		return "", fmt.Errorf("guardando descarga: %w", copyErr)
 	}
-	if err := tmp.Close(); err != nil {
+	if closeErr != nil {
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("cerrando temporal: %w", err)
+		return "", fmt.Errorf("cerrando temporal: %w", closeErr)
 	}
 
 	got := hex.EncodeToString(h.Sum(nil))
 	if !strings.EqualFold(got, wantHash) {
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("hash no coincide en %s: esperado %s, obtenido %s",
-			filepath.Base(url), wantHash, got)
+		return "", fmt.Errorf("%w en %s: esperado %s, obtenido %s",
+			errHashMismatch, filepath.Base(url), wantHash, got)
 	}
-
 	return tmpPath, nil
 }
 
-// progressWriter reporta cada bloque escrito (incremento en bytes) vía onChunk.
+// progressWriter cuenta los bytes acumulados del fichero y refresca el vigilante
+// de cuelgue en cada bloque recibido.
 type progressWriter struct {
-	onChunk func(n int64)
+	done       int64
+	onProgress func(fileDone int64)
+	onData     func()
 }
 
 func (p *progressWriter) Write(b []byte) (int, error) {
 	n := len(b)
-	p.onChunk(int64(n))
+	p.done += int64(n)
+	if p.onData != nil {
+		p.onData()
+	}
+	if p.onProgress != nil {
+		p.onProgress(p.done)
+	}
 	return n, nil
 }

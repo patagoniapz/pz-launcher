@@ -7,7 +7,7 @@
 //     autoactualiza y se relanza.
 //  4. Sincroniza los ficheros del juego (p. ej. projectzomboid.jar) por hash,
 //     mostrando progreso y tiempo estimado.
-//  5. Pregunta al usuario qué hacer: Jugar / Limpiar logs y jugar / Salir.
+//  5. Pregunta al usuario qué hacer: Jugar / Limpiar logs / Salir.
 //  6. Lanza el juego vía Steam (arranca Steam si está cerrado).
 //
 // Muestra el progreso en una ventana nativa (zenity); si no hay entorno gráfico
@@ -71,6 +71,7 @@ func main() {
 	// Limpia un posible "<exe>.old" dejado por una autoactualización anterior.
 	selfupdate.CleanupOld()
 
+	ui.SetVersion(version) // la versión aparece en el título de las ventanas
 	rep := ui.New()
 	defer rep.Close()
 
@@ -117,14 +118,19 @@ func main() {
 	if offline {
 		prompt = "Sin conexión (no se comprobaron actualizaciones)."
 	}
-	switch ui.AskAction(prompt + "\n¿Qué quieres hacer?") {
-	case ui.ActionQuit:
-		return
-	case ui.ActionCleanAndPlay:
-		cleanLogs(baseDir, &cfg)
-		launchGame(baseDir, m)
-	case ui.ActionPlay:
-		launchGame(baseDir, m)
+	prompt += "\n¿Qué quieres hacer?"
+
+	for {
+		switch ui.AskAction(prompt) {
+		case ui.ActionQuit:
+			return
+		case ui.ActionPlay:
+			launchGame(baseDir, m)
+			return
+		case ui.ActionCleanLogs:
+			// Limpia y vuelve a mostrar el diálogo (no arranca el juego).
+			cleanLogs(baseDir, &cfg)
+		}
 	}
 }
 
@@ -149,6 +155,11 @@ func cleanLogs(baseDir string, cfg *config.Config) {
 		return
 	}
 	log.Printf("Logs limpiados: %d elemento(s) en %s", removed, dir)
+	if removed == 0 {
+		ui.Info("No había logs que limpiar.")
+	} else {
+		ui.Info(fmt.Sprintf("Logs limpiados: %d elemento(s).", removed))
+	}
 }
 
 func launchGame(baseDir string, m *manifest.Manifest) {

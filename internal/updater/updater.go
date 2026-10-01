@@ -47,9 +47,10 @@ func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
 	tr := &tracker{rep: rep, total: totalBytes, start: time.Now()}
 	tr.render(time.Now())
 	for _, j := range jobs {
-		if err := replaceFile(j.dest, j.f, tr.add); err != nil {
+		if err := replaceFile(j.dest, j.f, tr); err != nil {
 			return err
 		}
+		tr.finishFile(j.f.Size)
 	}
 	rep.Progress(totalBytes, totalBytes)
 	return nil
@@ -57,20 +58,27 @@ func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
 
 // replaceFile descarga el fichero a un temporal (verificando su hash), hace una
 // copia de seguridad .bak del actual si existía, y mueve el nuevo a su sitio.
-func replaceFile(dest string, f manifest.File, onChunk func(n int64)) error {
+func replaceFile(dest string, f manifest.File, tr *tracker) error {
 	// El temporal se crea en la carpeta destino para que os.Rename sea atómico
 	// (mismo volumen) y no un copy-across-devices.
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return fmt.Errorf("creando carpeta de %s: %w", f.Path, err)
 	}
 
-	tmpPath, err := download.Verified(f.URL, filepath.Dir(dest), f.SHA256, onChunk)
+	tmpPath, err := download.Verified(f.URL, filepath.Dir(dest), f.SHA256,
+		tr.onFileProgress,
+		func(msg string) { tr.rep.Stage(msg) },
+	)
 	if err != nil {
 		return err
 	}
 
+	// Respaldo TEMPORAL solo para poder revertir si el intercambio falla.
+	// Se elimina al terminar: no dejamos ningún .bak.
 	bak := dest + ".bak"
+	hadDest := false
 	if _, err := os.Stat(dest); err == nil {
+		hadDest = true
 		_ = os.Remove(bak)
 		if err := os.Rename(dest, bak); err != nil {
 			os.Remove(tmpPath)
@@ -79,34 +87,47 @@ func replaceFile(dest string, f manifest.File, onChunk func(n int64)) error {
 	}
 
 	if err := os.Rename(tmpPath, dest); err != nil {
-		// Intentar restaurar el respaldo si el swap falla.
-		_ = os.Rename(bak, dest)
+		if hadDest {
+			_ = os.Rename(bak, dest) // restaurar
+		}
 		os.Remove(tmpPath)
 		return fmt.Errorf("reemplazando %s: %w", f.Path, err)
 	}
 
-	// Éxito: el .bak queda como red de seguridad hasta la próxima actualización.
+	// Éxito: borramos el respaldo temporal.
+	if hadDest {
+		_ = os.Remove(bak)
+	}
 	return nil
 }
 
-// tracker acumula los bytes descargados y refresca la UI (porcentaje + ETA),
-// limitando la frecuencia de refresco para no saturar el diálogo.
+// tracker muestra el progreso agregado. Lleva por separado los bytes de los
+// ficheros ya completados (completed) y los del fichero en curso (current), de
+// modo que si una descarga se reintenta desde cero el porcentaje no se descuadra.
 type tracker struct {
-	rep      ui.Reporter
-	total    int64
-	done     int64
-	start    time.Time
-	lastUIAt time.Time
+	rep       ui.Reporter
+	total     int64
+	completed int64
+	current   int64
+	start     time.Time
+	lastUIAt  time.Time
 }
 
-func (t *tracker) add(n int64) {
-	t.done += n
+// onFileProgress recibe los bytes acumulados del fichero en curso.
+func (t *tracker) onFileProgress(fileDone int64) {
+	t.current = fileDone
 	now := time.Now()
-	if now.Sub(t.lastUIAt) < 250*time.Millisecond && t.done < t.total {
+	if now.Sub(t.lastUIAt) < 250*time.Millisecond && (t.completed+t.current) < t.total {
 		return
 	}
 	t.lastUIAt = now
 	t.render(now)
+}
+
+// finishFile contabiliza un fichero terminado.
+func (t *tracker) finishFile(size int64) {
+	t.completed += size
+	t.current = 0
 }
 
 func (t *tracker) render(now time.Time) {
@@ -114,22 +135,23 @@ func (t *tracker) render(now time.Time) {
 		t.rep.Stage("Actualizando ficheros…")
 		return
 	}
-	pct := int(float64(t.done) / float64(t.total) * 100)
-	if pct > 100 {
-		pct = 100
+	done := t.completed + t.current
+	if done > t.total {
+		done = t.total
 	}
+	pct := int(float64(done) / float64(t.total) * 100)
 
 	eta := ""
 	elapsed := now.Sub(t.start).Seconds()
-	if elapsed > 0.5 && t.done > 0 && t.done < t.total {
-		speed := float64(t.done) / elapsed // bytes/seg
+	if elapsed > 0.5 && done > 0 && done < t.total {
+		speed := float64(done) / elapsed // bytes/seg
 		if speed > 0 {
-			eta = " · faltan ~" + formatDuration(float64(t.total-t.done)/speed)
+			eta = " · faltan ~" + formatDuration(float64(t.total-done)/speed)
 		}
 	}
 
 	t.rep.Stage(fmt.Sprintf("Actualizando ficheros… %d%%%s", pct, eta))
-	t.rep.Progress(t.done, t.total)
+	t.rep.Progress(done, t.total)
 }
 
 // formatDuration da una duración legible y breve a partir de segundos.

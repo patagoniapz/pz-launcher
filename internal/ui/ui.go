@@ -10,7 +10,16 @@ import (
 	"github.com/ncruces/zenity"
 )
 
-const appTitle = "PZ Launcher"
+// appTitle es el título de las ventanas. SetVersion le añade la versión.
+var appTitle = "PZ Launcher"
+
+// SetVersion añade la versión del launcher al título de las ventanas
+// (p. ej. "PZ Launcher 0.0.2"). Llamar antes de abrir cualquier diálogo.
+func SetVersion(v string) {
+	if v != "" {
+		appTitle = "PZ Launcher " + v
+	}
+}
 
 // Action es la elección del usuario en el diálogo posterior a la actualización.
 type Action int
@@ -20,25 +29,25 @@ const (
 	ActionQuit Action = iota
 	// ActionPlay: arrancar el juego.
 	ActionPlay
-	// ActionCleanAndPlay: limpiar los logs y luego arrancar el juego.
-	ActionCleanAndPlay
+	// ActionCleanLogs: limpiar los logs (sin arrancar el juego).
+	ActionCleanLogs
 )
 
-// AskAction muestra un diálogo con tres opciones (Jugar / Limpiar logs y jugar /
-// Salir) y devuelve la elección. Si no hay entorno gráfico, arranca el juego
-// por defecto (ActionPlay).
+// AskAction muestra un diálogo con tres opciones (Jugar / Limpiar logs / Salir)
+// y devuelve la elección. Si no hay entorno gráfico, arranca el juego por
+// defecto (ActionPlay).
 func AskAction(text string) Action {
 	err := zenity.Question(text,
 		zenity.Title(appTitle),
 		zenity.OKLabel("Jugar"),
-		zenity.ExtraButton("Limpiar logs y jugar"),
+		zenity.ExtraButton("Limpiar logs"),
 		zenity.CancelLabel("Salir"),
 	)
 	switch {
 	case err == nil:
 		return ActionPlay
 	case errors.Is(err, zenity.ErrExtraButton):
-		return ActionCleanAndPlay
+		return ActionCleanLogs
 	case errors.Is(err, zenity.ErrCanceled):
 		return ActionQuit
 	default:
