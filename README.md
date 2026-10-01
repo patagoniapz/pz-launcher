@@ -16,6 +16,9 @@ you drop **inside the game folder** (e.g.
    downloads only what changed.
 4. Starts the game.
 
+Progress is shown in a small **native window** (falls back to console if no GUI
+is available). On Windows it carries the Project Zomboid icon.
+
 ### Get it
 
 A prebuilt binary is provided in the [Releases](../../releases) section for
@@ -24,7 +27,7 @@ Windows, Linux and macOS — just download and drop it in the game folder.
 If you prefer, you can **download the source and build it yourself**:
 
 ```bash
-# requires Go 1.22+
+# requires Go 1.25+
 git clone https://github.com/patagoniapz/pz-launcher.git
 cd pz-launcher
 go build -o pzlauncher ./cmd/launcher     # add .exe on Windows
@@ -49,6 +52,9 @@ ejecutable que se deja **dentro de la carpeta del juego** (p. ej.
 3. Compara cada fichero gestionado (p. ej. `projectzomboid.jar`) por **SHA-256**
    y descarga solo lo que haya cambiado.
 4. Arranca el juego.
+
+El progreso se muestra en una pequeña **ventana nativa** (si no hay entorno
+gráfico, cae a consola). En Windows lleva el icono de Project Zomboid.
 
 ### Cómo obtenerlo
 

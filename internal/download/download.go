@@ -20,7 +20,10 @@ import (
 // Verified descarga url en un fichero temporal dentro de dir, comprueba que su
 // SHA-256 coincide con wantHash y devuelve la ruta del temporal. El llamante es
 // responsable de moverlo a su destino (os.Rename) y de borrarlo si algo falla.
-func Verified(url, dir, wantHash string) (string, error) {
+//
+// onProgress, si no es nil, se llama durante la descarga con los bytes recibidos
+// y el total esperado (total es -1 si el servidor no lo informa).
+func Verified(url, dir, wantHash string, onProgress func(done, total int64)) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -39,7 +42,11 @@ func Verified(url, dir, wantHash string) (string, error) {
 	tmpPath := tmp.Name()
 
 	h := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(tmp, h), resp.Body); err != nil {
+	dst := io.Writer(io.MultiWriter(tmp, h))
+	if onProgress != nil {
+		dst = io.MultiWriter(tmp, h, &progressWriter{total: resp.ContentLength, onProgress: onProgress})
+	}
+	if _, err := io.Copy(dst, resp.Body); err != nil {
 		tmp.Close()
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("guardando descarga: %w", err)
@@ -57,4 +64,18 @@ func Verified(url, dir, wantHash string) (string, error) {
 	}
 
 	return tmpPath, nil
+}
+
+// progressWriter cuenta los bytes escritos y los reporta vía onProgress.
+type progressWriter struct {
+	done       int64
+	total      int64
+	onProgress func(done, total int64)
+}
+
+func (p *progressWriter) Write(b []byte) (int, error) {
+	n := len(b)
+	p.done += int64(n)
+	p.onProgress(p.done, p.total)
+	return n, nil
 }

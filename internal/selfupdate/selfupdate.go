@@ -25,13 +25,14 @@ import (
 
 	"pzlauncher/internal/download"
 	"pzlauncher/internal/manifest"
+	"pzlauncher/internal/ui"
 )
 
 // MaybeUpdate comprueba si el manifiesto anuncia una versión del launcher más
 // nueva que current. Si es así, la descarga, la instala y relanza el proceso.
 // Devuelve relaunched=true cuando ha arrancado el nuevo binario (el llamante
 // debe terminar inmediatamente en ese caso).
-func MaybeUpdate(current string, m *manifest.Manifest) (relaunched bool, err error) {
+func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter) (relaunched bool, err error) {
 	if m.LauncherVersion == "" || !isNewer(m.LauncherVersion, current) {
 		return false, nil
 	}
@@ -44,7 +45,7 @@ func MaybeUpdate(current string, m *manifest.Manifest) (relaunched bool, err err
 		return false, nil
 	}
 
-	log.Printf("[launcher] actualizando %s -> %s", current, m.LauncherVersion)
+	rep.Stage(fmt.Sprintf("Actualizando el launcher a %s…", m.LauncherVersion))
 
 	exe, err := os.Executable()
 	if err != nil {
@@ -53,7 +54,7 @@ func MaybeUpdate(current string, m *manifest.Manifest) (relaunched bool, err err
 	exe, _ = filepath.EvalSymlinks(exe)
 	dir := filepath.Dir(exe)
 
-	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256)
+	tmpPath, err := download.Verified(asset.URL, dir, asset.SHA256, rep.Progress)
 	if err != nil {
 		return false, err
 	}

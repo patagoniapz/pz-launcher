@@ -4,19 +4,19 @@ package updater
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	"pzlauncher/internal/download"
 	"pzlauncher/internal/hashutil"
 	"pzlauncher/internal/manifest"
+	"pzlauncher/internal/ui"
 )
 
 // SyncFiles recorre los ficheros del manifiesto, comparando el hash local con
 // el esperado. Descarga y reemplaza únicamente los que falten o difieran.
 // baseDir es la carpeta del launcher; los paths del manifiesto son relativos a ella.
-func SyncFiles(baseDir string, files []manifest.File) error {
+func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
 	for _, f := range files {
 		dest := filepath.Join(baseDir, filepath.FromSlash(f.Path))
 
@@ -25,34 +25,27 @@ func SyncFiles(baseDir string, files []manifest.File) error {
 			return fmt.Errorf("hash local de %s: %w", f.Path, err)
 		}
 		if local == f.SHA256 {
-			log.Printf("[ok] %s está actualizado", f.Path)
 			continue
 		}
 
-		if local == "" {
-			log.Printf("[nuevo] %s no existe, descargando...", f.Path)
-		} else {
-			log.Printf("[actualizar] %s cambió, descargando...", f.Path)
-		}
-
-		if err := replaceFile(baseDir, dest, f); err != nil {
+		rep.Stage(fmt.Sprintf("Descargando %s…", f.Path))
+		if err := replaceFile(baseDir, dest, f, rep); err != nil {
 			return err
 		}
-		log.Printf("[listo] %s actualizado", f.Path)
 	}
 	return nil
 }
 
 // replaceFile descarga el fichero a un temporal (verificando su hash), hace una
 // copia de seguridad .bak del actual si existía, y mueve el nuevo a su sitio.
-func replaceFile(baseDir, dest string, f manifest.File) error {
+func replaceFile(baseDir, dest string, f manifest.File, rep ui.Reporter) error {
 	// El temporal se crea en la carpeta destino para que os.Rename sea atómico
 	// (mismo volumen) y no un copy-across-devices.
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return fmt.Errorf("creando carpeta de %s: %w", f.Path, err)
 	}
 
-	tmpPath, err := download.Verified(f.URL, filepath.Dir(dest), f.SHA256)
+	tmpPath, err := download.Verified(f.URL, filepath.Dir(dest), f.SHA256, rep.Progress)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,9 @@
 //  4. Sincroniza los ficheros del juego (p. ej. projectzomboid.jar) por hash.
 //  5. Lanza el juego.
 //
+// Muestra el progreso en una ventana nativa (zenity); si no hay entorno gráfico
+// disponible, cae a registrar el progreso por consola.
+//
 // Se deja dentro de la carpeta del juego, p. ej.:
 //
 //	D:\Program Files (x86)\Steam\steamapps\common\ProjectZomboid\pzlauncher.exe
@@ -15,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -22,6 +26,7 @@ import (
 	"pzlauncher/internal/manifest"
 	"pzlauncher/internal/paths"
 	"pzlauncher/internal/selfupdate"
+	"pzlauncher/internal/ui"
 	"pzlauncher/internal/updater"
 )
 
@@ -37,15 +42,15 @@ func main() {
 	log.SetFlags(0)
 
 	var (
-		noLaunch   = flag.Bool("no-launch", false, "actualizar pero no arrancar el juego")
-		noSelf     = flag.Bool("no-self-update", false, "no autoactualizar el launcher")
-		showVer    = flag.Bool("version", false, "mostrar la versión y salir")
+		noLaunch    = flag.Bool("no-launch", false, "actualizar pero no arrancar el juego")
+		noSelf      = flag.Bool("no-self-update", false, "no autoactualizar el launcher")
+		showVer     = flag.Bool("version", false, "mostrar la versión y salir")
 		urlOverride = flag.String("manifest", "", "URL del manifiesto (sobrescribe el valor por defecto)")
 	)
 	flag.Parse()
 
 	if *showVer {
-		log.Printf("pzlauncher %s", version)
+		fmt.Println("pzlauncher " + version)
 		return
 	}
 
@@ -62,25 +67,30 @@ func main() {
 	// Limpia un posible "<exe>.old" dejado por una autoactualización anterior.
 	selfupdate.CleanupOld()
 
+	rep := ui.New()
+	defer rep.Close()
+
 	baseDir, err := paths.ExecutableDir()
 	if err != nil {
-		fatal("no se pudo determinar la carpeta del launcher: %v", err)
+		ui.ShowError("No se pudo determinar la carpeta del launcher: " + err.Error())
+		os.Exit(1)
 	}
 	log.Printf("pzlauncher %s | carpeta: %s", version, baseDir)
 
+	rep.Stage("Comprobando actualizaciones…")
 	m, err := manifest.Fetch(url)
 	if err != nil {
 		// Sin conexión no debería impedir jugar: avisamos y arrancamos igual.
 		log.Printf("[aviso] no se pudo obtener el manifiesto: %v", err)
-		log.Printf("[aviso] se arranca el juego sin comprobar actualizaciones")
 		if !*noLaunch {
+			rep.Success("Sin conexión. Iniciando el juego…")
 			launchBestEffort(baseDir)
 		}
 		return
 	}
 
 	if !*noSelf {
-		relaunched, err := selfupdate.MaybeUpdate(version, m)
+		relaunched, err := selfupdate.MaybeUpdate(version, m, rep)
 		if err != nil {
 			log.Printf("[aviso] fallo autoactualizando el launcher: %v", err)
 		} else if relaunched {
@@ -89,17 +99,20 @@ func main() {
 		}
 	}
 
-	if err := updater.SyncFiles(baseDir, m.Files); err != nil {
-		fatal("actualizando ficheros: %v", err)
+	if err := updater.SyncFiles(baseDir, m.Files, rep); err != nil {
+		ui.ShowError("Error actualizando ficheros: " + err.Error())
+		os.Exit(1)
 	}
 
 	if *noLaunch {
-		log.Printf("Listo. (--no-launch: no se arranca el juego)")
+		rep.Success("Actualización completada.")
 		return
 	}
 
+	rep.Success("¡Listo! Iniciando Project Zomboid…")
 	if err := gamelaunch.Launch(baseDir, m); err != nil {
-		fatal("%v", err)
+		ui.ShowError(err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -114,9 +127,4 @@ func launchBestEffort(baseDir string) {
 	if err := gamelaunch.Launch(baseDir, fallback); err != nil {
 		log.Printf("[aviso] %v", err)
 	}
-}
-
-func fatal(format string, args ...any) {
-	log.Printf("ERROR: "+format, args...)
-	os.Exit(1)
 }
