@@ -7,8 +7,9 @@
 ## 🇬🇧 English
 
 Cross-platform **launcher / updater for Project Zomboid**. A single executable
-you drop **inside the game folder** (e.g.
-`...\Steam\steamapps\common\ProjectZomboid`). On launch it:
+you can run from **anywhere** — it **auto-detects your Steam install** of the
+game (registry + `libraryfolders.vdf`, so it also finds installs on other
+drives). On launch it:
 
 1. Reads a `manifest.json` from GitHub Releases.
 2. Self-updates if a newer launcher version is published.
@@ -29,9 +30,12 @@ Steam if it is closed. "Clean logs" wipes `%UserProfile%\Zomboid\Logs\` and the
 Downloads are resilient to flaky connections: a stalled transfer is detected and
 automatically retried.
 
-The Zomboid data folder is autodetected at `%UserProfile%\Zomboid` (`~/Zomboid`).
-Override it with the `PZL_ZOMBOID_DIR` env var or a `pzlauncher.json` next to the
-executable: `{ "zomboid_dir": "D:\\otra\\ruta\\Zomboid" }`.
+The **game install** folder is auto-detected via Steam; the **Zomboid data**
+folder (logs/saves) is autodetected at `%UserProfile%\Zomboid` (`~/Zomboid`).
+Both can be overridden with env vars (`PZL_GAME_DIR`, `PZL_ZOMBOID_DIR`) or a
+`pzlauncher.json` next to the executable:
+`{ "game_dir": "D:\\...\\ProjectZomboid", "zomboid_dir": "D:\\...\\Zomboid" }`.
+Run `pzlauncher --detect` to print the detected game folder.
 
 ### Get it
 
@@ -58,8 +62,9 @@ go build -ldflags "-X main.version=1.0.0 -X main.manifestURL=https://github.com/
 ## 🇪🇸 Español
 
 **Launcher / actualizador multiplataforma para Project Zomboid**. Un único
-ejecutable que se deja **dentro de la carpeta del juego** (p. ej.
-`...\Steam\steamapps\common\ProjectZomboid`). Al arrancar:
+ejecutable que puedes ejecutar desde **cualquier sitio** — **autodetecta tu
+instalación de Steam** del juego (registro + `libraryfolders.vdf`, así encuentra
+también instalaciones en otros discos). Al arrancar:
 
 1. Lee un `manifest.json` desde GitHub Releases.
 2. Se autoactualiza si hay una versión más nueva del launcher.
@@ -80,9 +85,12 @@ Steam si está cerrado. "Limpiar logs" borra `%UserProfile%\Zomboid\Logs\` y los
 Las descargas toleran conexiones inestables: si la transferencia se queda parada,
 se detecta y se reintenta automáticamente.
 
-La carpeta de datos de Zomboid se autodetecta en `%UserProfile%\Zomboid`
-(`~/Zomboid`). Puedes cambiarla con la variable `PZL_ZOMBOID_DIR` o con un
-`pzlauncher.json` junto al ejecutable: `{ "zomboid_dir": "D:\\otra\\ruta\\Zomboid" }`.
+La carpeta de **instalación** del juego se autodetecta vía Steam; la carpeta de
+**datos** de Zomboid (logs/partidas) se autodetecta en `%UserProfile%\Zomboid`
+(`~/Zomboid`). Ambas se pueden cambiar con variables (`PZL_GAME_DIR`,
+`PZL_ZOMBOID_DIR`) o con un `pzlauncher.json` junto al ejecutable:
+`{ "game_dir": "D:\\...\\ProjectZomboid", "zomboid_dir": "D:\\...\\Zomboid" }`.
+Ejecuta `pzlauncher --detect` para ver la carpeta del juego detectada.
 
 ### Cómo obtenerlo
 

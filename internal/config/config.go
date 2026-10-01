@@ -11,6 +11,10 @@ import (
 
 // Config son los ajustes persistentes del launcher.
 type Config struct {
+	// GameDir sobrescribe la carpeta de INSTALACIÓN del juego autodetectada
+	// (…\steamapps\common\ProjectZomboid). Vacío = autodetectar vía Steam.
+	GameDir string `json:"game_dir,omitempty"`
+
 	// ZomboidDir sobrescribe la carpeta de datos de Zomboid autodetectada
 	// (%UserProfile%\Zomboid). Vacío = autodetectar.
 	ZomboidDir string `json:"zomboid_dir,omitempty"`

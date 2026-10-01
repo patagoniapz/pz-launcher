@@ -1,38 +1,41 @@
 // Command launcher es el actualizador/lanzador multiplataforma de Project Zomboid.
 //
 // Flujo al arrancar:
-//  1. Resuelve la carpeta del propio ejecutable (rutas relativas a ella).
-//  2. Descarga el manifiesto (manifest.json).
-//  3. Si el manifiesto anuncia una versión del launcher más nueva, se
+//  1. Descarga el manifiesto (manifest.json).
+//  2. Si el manifiesto anuncia una versión del launcher más nueva, se
 //     autoactualiza y se relanza.
-//  4. Sincroniza los ficheros del juego (p. ej. projectzomboid.jar) por hash,
-//     mostrando progreso y tiempo estimado.
-//  5. Pregunta al usuario qué hacer: Jugar / Limpiar logs / Salir.
-//  6. Lanza el juego vía Steam (arranca Steam si está cerrado).
+//  3. Localiza la carpeta de INSTALACIÓN del juego (autodetección vía Steam; si
+//     no, pregunta y la recuerda) y sincroniza sus ficheros (p. ej.
+//     projectzomboid.jar) por hash, mostrando progreso y tiempo estimado.
+//  4. Pregunta al usuario qué hacer: Jugar / Limpiar logs / Salir.
+//  5. Lanza el juego vía Steam (arranca Steam si está cerrado).
 //
-// Muestra el progreso en una ventana nativa (zenity); si no hay entorno gráfico
-// disponible, cae a registrar el progreso por consola.
-//
-// Se deja dentro de la carpeta del juego, p. ej.:
-//
-//	D:\Program Files (x86)\Steam\steamapps\common\ProjectZomboid\pzlauncher.exe
+// El ejecutable NO necesita estar dentro de la carpeta del juego: detecta dónde
+// está instalado. Muestra el progreso en una ventana nativa (zenity); si no hay
+// entorno gráfico, cae a registrar el progreso por consola.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"pzlauncher/internal/config"
 	"pzlauncher/internal/gamelaunch"
 	"pzlauncher/internal/manifest"
 	"pzlauncher/internal/paths"
 	"pzlauncher/internal/selfupdate"
+	"pzlauncher/internal/steam"
 	"pzlauncher/internal/ui"
 	"pzlauncher/internal/updater"
 	"pzlauncher/internal/zomboid"
 )
+
+const pzAppID = 108600 // Project Zomboid en Steam
 
 // Valores inyectados en tiempo de compilación con -ldflags:
 //
@@ -49,12 +52,22 @@ func main() {
 		noLaunch    = flag.Bool("no-launch", false, "actualizar pero no arrancar el juego")
 		noSelf      = flag.Bool("no-self-update", false, "no autoactualizar el launcher")
 		showVer     = flag.Bool("version", false, "mostrar la versión y salir")
+		detect      = flag.Bool("detect", false, "mostrar la carpeta del juego detectada y salir")
 		urlOverride = flag.String("manifest", "", "URL del manifiesto (sobrescribe el valor por defecto)")
 	)
 	flag.Parse()
 
 	if *showVer {
 		fmt.Println("pzlauncher " + version)
+		return
+	}
+
+	if *detect {
+		if dir, ok := steam.FindGameDir(pzAppID); ok {
+			fmt.Println(dir)
+		} else {
+			fmt.Println("No se detectó la carpeta de Project Zomboid.")
+		}
 		return
 	}
 
@@ -75,17 +88,18 @@ func main() {
 	rep := ui.New()
 	defer rep.Close()
 
-	baseDir, err := paths.ExecutableDir()
+	exeDir, err := paths.ExecutableDir()
 	if err != nil {
 		ui.ShowError("No se pudo determinar la carpeta del launcher: " + err.Error())
 		os.Exit(1)
 	}
-	cfg := config.Load(baseDir)
-	log.Printf("pzlauncher %s | carpeta: %s", version, baseDir)
+	cfg := config.Load(exeDir)
+	log.Printf("pzlauncher %s | carpeta del exe: %s", version, exeDir)
 
 	rep.Stage("Comprobando actualizaciones…")
 	m, err := manifest.Fetch(url)
 	offline := err != nil
+	var gameDir string
 	if offline {
 		// Sin conexión no debería impedir jugar: avisamos y seguimos con un
 		// manifiesto mínimo para poder lanzar el juego igualmente.
@@ -101,7 +115,19 @@ func main() {
 				return
 			}
 		}
-		if err := updater.SyncFiles(baseDir, m.Files, rep); err != nil {
+
+		appID := m.SteamAppID
+		if appID == 0 {
+			appID = pzAppID
+		}
+		gameDir, err = resolveGameDir(exeDir, &cfg, appID)
+		if err != nil {
+			ui.ShowError(err.Error())
+			os.Exit(1)
+		}
+		log.Printf("carpeta del juego: %s", gameDir)
+
+		if err := updater.SyncFiles(gameDir, m.Files, rep); err != nil {
 			ui.ShowError("Error actualizando ficheros: " + err.Error())
 			os.Exit(1)
 		}
@@ -125,18 +151,60 @@ func main() {
 		case ui.ActionQuit:
 			return
 		case ui.ActionPlay:
-			launchGame(baseDir, m)
+			launchGame(gameDir, m)
 			return
 		case ui.ActionCleanLogs:
 			// Limpia y vuelve a mostrar el diálogo (no arranca el juego).
-			cleanLogs(baseDir, &cfg)
+			cleanLogs(exeDir, &cfg)
 		}
 	}
 }
 
+// resolveGameDir localiza la carpeta de instalación del juego con esta prioridad:
+//  1. Variable de entorno PZL_GAME_DIR.
+//  2. Valor guardado en la config (pzlauncher.json).
+//  3. El propio exe ya está dentro de la carpeta del juego.
+//  4. Autodetección vía Steam.
+//  5. Preguntar al usuario (y recordar la elección).
+func resolveGameDir(exeDir string, cfg *config.Config, appID int) (string, error) {
+	if env := os.Getenv("PZL_GAME_DIR"); env != "" {
+		return env, nil
+	}
+	if cfg.GameDir != "" && dirExists(cfg.GameDir) {
+		return cfg.GameDir, nil
+	}
+	if hasGameExe(exeDir) {
+		return exeDir, nil
+	}
+	if dir, ok := steam.FindGameDir(appID); ok {
+		return dir, nil
+	}
+	if picked, ok := ui.PickFolder("Selecciona la carpeta de instalación de Project Zomboid"); ok {
+		cfg.GameDir = picked
+		_ = config.Save(exeDir, *cfg)
+		return picked, nil
+	}
+	return "", errors.New("No se encontró la carpeta de instalación de Project Zomboid.")
+}
+
+// hasGameExe indica si dir parece la carpeta del juego (contiene su ejecutable).
+func hasGameExe(dir string) bool {
+	for _, name := range []string{"ProjectZomboid64.exe", "ProjectZomboid64"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func dirExists(dir string) bool {
+	info, err := os.Stat(dir)
+	return err == nil && info.IsDir()
+}
+
 // cleanLogs borra los logs del cliente de la carpeta de datos de Zomboid.
 // Si no se encuentra, pide al usuario que la seleccione y recuerda la elección.
-func cleanLogs(baseDir string, cfg *config.Config) {
+func cleanLogs(exeDir string, cfg *config.Config) {
 	dir := zomboid.Resolve(cfg.ZomboidDir)
 	if !zomboid.Exists(dir) {
 		picked, ok := ui.PickFolder("Selecciona tu carpeta Zomboid (donde están los logs)")
@@ -146,7 +214,7 @@ func cleanLogs(baseDir string, cfg *config.Config) {
 		}
 		dir = picked
 		cfg.ZomboidDir = picked
-		_ = config.Save(baseDir, *cfg)
+		_ = config.Save(exeDir, *cfg)
 	}
 
 	removed, err := zomboid.CleanLogs(dir)
@@ -162,8 +230,8 @@ func cleanLogs(baseDir string, cfg *config.Config) {
 	}
 }
 
-func launchGame(baseDir string, m *manifest.Manifest) {
-	if err := gamelaunch.Launch(baseDir, m); err != nil {
+func launchGame(gameDir string, m *manifest.Manifest) {
+	if err := gamelaunch.Launch(gameDir, m); err != nil {
 		ui.ShowError(err.Error())
 		os.Exit(1)
 	}
@@ -171,12 +239,12 @@ func launchGame(baseDir string, m *manifest.Manifest) {
 
 // offlineManifest da el mínimo para poder lanzar el juego sin conexión.
 func offlineManifest() *manifest.Manifest {
+	exe := "ProjectZomboid64.exe"
+	if runtime.GOOS != "windows" {
+		exe = "./ProjectZomboid64"
+	}
 	return &manifest.Manifest{
-		SteamAppID: 108600, // Project Zomboid
-		Launch: map[string]manifest.LaunchSpec{
-			"windows": {Exe: "ProjectZomboid64.exe"},
-			"linux":   {Exe: "./ProjectZomboid64"},
-			"darwin":  {Exe: "./ProjectZomboid64"},
-		},
+		SteamAppID: pzAppID,
+		Launch:     map[string]manifest.LaunchSpec{runtime.GOOS: {Exe: exe}},
 	}
 }
