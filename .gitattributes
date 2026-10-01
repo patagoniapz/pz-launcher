@@ -1,0 +1,8 @@
+# Normaliza finales de línea a LF en el repositorio (evita CRLF accidental en
+# Windows), clave para que el workflow de CI (bash en Linux) funcione.
+* text=auto eol=lf
+
+# Binarios: nunca tocar finales de línea.
+*.jar binary
+*.exe binary
+*.png binary
