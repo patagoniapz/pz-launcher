@@ -1,12 +1,15 @@
--- Patagonia #45 (CLIENTE BASE, distribuido por el launcher) — etiqueta de la cola de servidor-lleno.
+-- Patagonia #45 — etiqueta de la cola de servidor-lleno (pantalla de conexion).
 --
--- POR QUE VA EN EL CLIENTE BASE Y NO EN EL MOD:
--- La cola de servidor-lleno (#45) se dispara en LoginPacket, en la pantalla de conexion
--- (ConnectToServerState), ANTES de que el cliente descargue y active los mods del server. En ese
--- momento NADA del mod Patagonia esta cargado (ni su Lua ni sus traducciones), asi que un fix dentro
--- del mod nunca corre ahi (mismo fenomeno que nos paso con ItemAwards). Este archivo, al llegar por el
--- launcher, queda en media/lua/client del juego base -> se carga al bootear -> SI esta activo en esa
--- pantalla.
+-- ESTE ARCHIVO VIVE EN DOS LUGARES IDENTICOS, CADA UNO CON SU ROL:
+--   1) Cliente BASE via launcher (launcher/payload/media/lua/client/) -> se carga al bootear, asi
+--      esta ACTIVO en la pantalla de conexion (ConnectToServerState), que corre ANTES de que el
+--      cliente descargue/active los mods del server. Por eso NO alcanza con tenerlo solo en el mod:
+--      el Lua del mod no esta cargado todavia en esa pantalla (mismo fenomeno que ItemAwards).
+--   2) Mod Patagonia (media/lua/client/) -> su UNICO proposito aqui es que el SERVIDOR tenga el
+--      archivo automaticamente (via el deploy normal del mod), para que pase el file-check de PZ
+--      ("File doesn't exist on the server: media/lua/client/..."). En el server dedicado es inerte
+--      (headless no ejecuta Lua cliente); solo tiene que existir en la misma ruta virtual.
+-- MANTENER AMBAS COPIAS IDENTICAS (mismo contenido) para que coincida la ruta/los bytes.
 --
 -- QUE HACE:
 -- Cuando el server esta lleno, el jar #45 encola al jugador y le manda QueuePacket PlaceInQueue con su
