@@ -1,15 +1,21 @@
 -- Patagonia #45 — etiqueta de la cola de servidor-lleno (pantalla de conexion).
 --
--- ESTE ARCHIVO VIVE EN DOS LUGARES IDENTICOS, CADA UNO CON SU ROL:
---   1) Cliente BASE via launcher (launcher/payload/media/lua/client/) -> se carga al bootear, asi
---      esta ACTIVO en la pantalla de conexion (ConnectToServerState), que corre ANTES de que el
---      cliente descargue/active los mods del server. Por eso NO alcanza con tenerlo solo en el mod:
---      el Lua del mod no esta cargado todavia en esa pantalla (mismo fenomeno que ItemAwards).
---   2) Mod Patagonia (media/lua/client/) -> su UNICO proposito aqui es que el SERVIDOR tenga el
---      archivo automaticamente (via el deploy normal del mod), para que pase el file-check de PZ
---      ("File doesn't exist on the server: media/lua/client/..."). En el server dedicado es inerte
---      (headless no ejecuta Lua cliente); solo tiene que existir en la misma ruta virtual.
--- MANTENER AMBAS COPIAS IDENTICAS (mismo contenido) para que coincida la ruta/los bytes.
+-- ESTE ARCHIVO ES DEL CLIENTE BASE (media/lua/client), NO va en el mod. Razones:
+--   A) CARGA: la pantalla de conexion (ConnectToServerState) corre ANTES de que el cliente
+--      descargue/active los mods del server -> un Lua dentro del mod no esta cargado ahi (mismo
+--      fenomeno que ItemAwards). Como archivo base se carga al bootear y SI esta activo en esa pantalla.
+--   B) CHECKSUM (NetChecksum/LuaManager.LoadDirBase): el server valida el Lua del cliente comparando
+--      la lista de archivos POR POSICION. Esa lista = [archivos BASE ordenados] + [archivos de MODS al
+--      final] (con dedup por ruta, gana el base). Si este archivo estuviera en base en el cliente pero
+--      en el mod en el server, quedaria en secciones distintas -> listas DESALINEADAS -> el server
+--      reporta falsos "File doesn't exist on the client" en archivos vanilla siguientes (p.ej.
+--      pzapi/ModOptions.lua). Por eso DEBE estar en media/lua/client BASE EN AMBOS LADOS.
+--
+-- DISTRIBUCION:
+--   * Cliente: lo instala el launcher (este payload) en <juego>/media/lua/client/.
+--   * Servidor: hay que copiar el MISMO archivo (byte-identico) al <server>/media/lua/client/ en el
+--     deploy, junto al jar #45. NO alcanza con tenerlo en el mod (ver punto B). Tras copiarlo hay que
+--     REINICIAR el server para que recompute GameServer.checksum incluyendolo.
 --
 -- QUE HACE:
 -- Cuando el server esta lleno, el jar #45 encola al jugador y le manda QueuePacket PlaceInQueue con su
