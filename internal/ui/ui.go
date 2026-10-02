@@ -6,6 +6,7 @@ package ui
 import (
 	"errors"
 	"log"
+	"strings"
 
 	"github.com/ncruces/zenity"
 )
@@ -31,29 +32,56 @@ const (
 	ActionPlay
 	// ActionCleanLogs: limpiar los logs (sin arrancar el juego).
 	ActionCleanLogs
+	// ActionSettings: abrir los ajustes de rendimiento (sin arrancar el juego).
+	ActionSettings
 )
 
-// AskAction muestra un diálogo con tres opciones (Jugar / Limpiar logs / Salir)
-// y devuelve la elección. Si no hay entorno gráfico, arranca el juego por
-// defecto (ActionPlay).
+// Etiquetas del menú principal (también usadas para mapear la elección).
+const (
+	menuPlay     = "Jugar"
+	menuSettings = "Ajustes de rendimiento"
+	menuClean    = "Limpiar logs"
+	menuQuit     = "Salir"
+)
+
+// AskAction muestra el menú principal (Jugar / Ajustes de rendimiento / Limpiar
+// logs / Salir) y devuelve la elección. Si no hay entorno gráfico, arranca el
+// juego por defecto (ActionPlay).
 func AskAction(text string) Action {
-	err := zenity.Question(text,
+	choice, err := zenity.List(text,
+		[]string{menuPlay, menuSettings, menuClean, menuQuit},
 		zenity.Title(appTitle),
-		zenity.OKLabel("Jugar"),
-		zenity.ExtraButton("Limpiar logs"),
-		zenity.CancelLabel("Salir"),
+		zenity.DefaultItems(menuPlay),
+		zenity.DisallowEmpty(),
 	)
-	switch {
-	case err == nil:
-		return ActionPlay
-	case errors.Is(err, zenity.ErrExtraButton):
-		return ActionCleanLogs
-	case errors.Is(err, zenity.ErrCanceled):
-		return ActionQuit
-	default:
+	if err != nil {
+		if errors.Is(err, zenity.ErrCanceled) {
+			return ActionQuit
+		}
 		// Sin GUI disponible (p. ej. consola): comportamiento por defecto.
 		return ActionPlay
 	}
+	switch choice {
+	case menuSettings:
+		return ActionSettings
+	case menuClean:
+		return ActionCleanLogs
+	case menuQuit:
+		return ActionQuit
+	default:
+		return ActionPlay
+	}
+}
+
+// AskText muestra un cuadro de entrada de texto con un mensaje explicativo y un
+// valor por defecto. Devuelve el texto introducido y true, o ("", false) si el
+// usuario canceló o no hay entorno gráfico.
+func AskText(prompt, def string) (string, bool) {
+	s, err := zenity.Entry(prompt, zenity.Title(appTitle), zenity.EntryText(def))
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(s), true
 }
 
 // PickFolder abre un selector de carpeta. Devuelve la ruta y true si el usuario

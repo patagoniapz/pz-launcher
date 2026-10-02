@@ -1,0 +1,94 @@
+package gameopts
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func contains(args []string, want string) bool {
+	for _, a := range args {
+		if a == want {
+			return true
+		}
+	}
+	return false
+}
+
+func countPrefix(args []string, prefix string) int {
+	n := 0
+	for _, a := range args {
+		if strings.HasPrefix(a, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+func TestSetVMArgs(t *testing.T) {
+	base := []string{"-Djava.awt.headless=false", "-Xmx3072m", "-Dpz.chunkBudgetMs=99"}
+
+	// chunk>0 reemplaza el flag previo (sin duplicar); heap=0 deja -Xmx intacto.
+	got := setVMArgs(base, 4, 0)
+	if countPrefix(got, chunkArgPrefix) != 1 || !contains(got, "-Dpz.chunkBudgetMs=4") {
+		t.Fatalf("chunk no quedó en 4 único: %v", got)
+	}
+	if !contains(got, "-Xmx3072m") {
+		t.Fatalf("heap=0 no debía tocar -Xmx: %v", got)
+	}
+	if !contains(got, "-Djava.awt.headless=false") {
+		t.Fatalf("se perdió un arg no gestionado: %v", got)
+	}
+
+	// chunk=0 quita el flag (vuelve a vanilla); heap>0 reemplaza -Xmx.
+	got = setVMArgs(base, 0, 6144)
+	if countPrefix(got, chunkArgPrefix) != 0 {
+		t.Fatalf("chunk=0 debía quitar el flag: %v", got)
+	}
+	if countPrefix(got, "-Xmx") != 1 || !contains(got, "-Xmx6144m") {
+		t.Fatalf("heap no quedó en 6144 único: %v", got)
+	}
+}
+
+func TestApplyPreservesOtherKeys(t *testing.T) {
+	dir := t.TempDir()
+	src := `{
+	"mainClass": "zombie/gameStates/MainScreenState",
+	"classpath": ["java/.", "java/projectzomboid.jar"],
+	"vmArgs": ["-Dzomboid.steam=1", "-Xmx3072m"]
+}`
+	if err := os.WriteFile(filepath.Join(dir, jsonName), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Apply(dir, 5, 4096); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, jsonName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatal(err)
+	}
+	if root["mainClass"] != "zombie/gameStates/MainScreenState" {
+		t.Fatalf("se perdió mainClass: %v", root["mainClass"])
+	}
+	if _, ok := root["classpath"]; !ok {
+		t.Fatalf("se perdió classpath")
+	}
+	var args []string
+	for _, v := range root["vmArgs"].([]any) {
+		args = append(args, v.(string))
+	}
+	if !contains(args, "-Dpz.chunkBudgetMs=5") || !contains(args, "-Xmx4096m") {
+		t.Fatalf("no se aplicaron los flags: %v", args)
+	}
+	if !contains(args, "-Dzomboid.steam=1") {
+		t.Fatalf("se perdió un vmArg previo: %v", args)
+	}
+}

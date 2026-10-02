@@ -18,6 +18,20 @@ type Config struct {
 	// ZomboidDir sobrescribe la carpeta de datos de Zomboid autodetectada
 	// (%UserProfile%\Zomboid). Vacío = autodetectar.
 	ZomboidDir string `json:"zomboid_dir,omitempty"`
+
+	// PerfConfigured indica que el jugador ya pasó por "Ajustes de rendimiento"
+	// al menos una vez (para no insistir y para saber que los valores de abajo
+	// son intencionales aunque sean 0).
+	PerfConfigured bool `json:"perf_configured,omitempty"`
+
+	// ChunkBudgetMs es el presupuesto por frame (ms) del fix anti-tirones (C11).
+	// 0 = desactivado (vanilla). Se escribe como -Dpz.chunkBudgetMs en el json
+	// del juego.
+	ChunkBudgetMs int `json:"chunk_budget_ms,omitempty"`
+
+	// MaxHeapMB es el -Xmx (MB) a fijar en el json del juego. 0 = no gestionar
+	// (dejar el valor del juego como esté).
+	MaxHeapMB int `json:"max_heap_mb,omitempty"`
 }
 
 func file(baseDir string) string {

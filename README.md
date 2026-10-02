@@ -21,11 +21,23 @@ Progress is shown in a small **native window** with an **estimated time left**
 (falls back to console if no GUI is available). On Windows it carries the
 Project Zomboid icon.
 
-It does **not** auto-launch: after updating it asks **Play / Clean logs / Quit**.
-"Clean logs" only cleans (it does not start the game) and re-shows the dialog.
-The game is started **through Steam** (`steam://rungameid/108600`), which boots
-Steam if it is closed. "Clean logs" wipes `%UserProfile%\Zomboid\Logs\` and the
-`*console.txt` files (never your saves or mods).
+It does **not** auto-launch: after updating it asks **Play / Performance
+settings / Clean logs / Quit**. The game is started **through Steam**
+(`steam://rungameid/108600`), which boots Steam if it is closed. "Clean logs"
+wipes `%UserProfile%\Zomboid\Logs\` and the `*console.txt` files (never your
+saves or mods).
+
+**Performance settings** let players tune two optional things without editing
+files by hand; both are **off/default** unless enabled, and the launcher writes
+them into the game's `ProjectZomboid64.json` (re-applied every launch, so a Steam
+update or "Verify integrity" can't lose them):
+
+- **Movement stutter fix** (`-Dpz.chunkBudgetMs`): spreads map-chunk loading over
+  several frames to smooth the micro-stutters when you move or enter new areas.
+  Lower = smoother but terrain pops in slightly later. Recommended 4-8; `0` (or
+  blank) = disabled (vanilla).
+- **Memory** (`-Xmx`): the launcher detects your total RAM and suggests a heap
+  size you can accept or change. `0` (or blank) leaves the game's default.
 
 Downloads are resilient to flaky connections: a stalled transfer is detected and
 automatically retried.
@@ -76,11 +88,25 @@ El progreso se muestra en una pequeña **ventana nativa** con **tiempo estimado
 restante** (si no hay entorno gráfico, cae a consola). En Windows lleva el icono
 de Project Zomboid.
 
-**No** arranca el juego solo: tras actualizar pregunta **Jugar / Limpiar logs /
-Salir**. "Limpiar logs" solo limpia (no arranca el juego) y vuelve a mostrar el
-diálogo. El juego se lanza **vía Steam** (`steam://rungameid/108600`), que abre
-Steam si está cerrado. "Limpiar logs" borra `%UserProfile%\Zomboid\Logs\` y los
-`*console.txt` (nunca tus partidas ni mods).
+**No** arranca el juego solo: tras actualizar pregunta **Jugar / Ajustes de
+rendimiento / Limpiar logs / Salir**. El juego se lanza **vía Steam**
+(`steam://rungameid/108600`), que abre Steam si está cerrado. "Limpiar logs"
+borra `%UserProfile%\Zomboid\Logs\` y los `*console.txt` (nunca tus partidas ni
+mods).
+
+**Ajustes de rendimiento**: permiten al jugador configurar dos cosas opcionales
+sin editar ficheros a mano; ambas vienen **desactivadas/por defecto** salvo que
+se activen, y el launcher las escribe en el `ProjectZomboid64.json` del juego
+(reaplicadas en cada arranque, así un update de Steam o "Verificar integridad" no
+las pierde):
+
+- **Fix de tirones al moverse** (`-Dpz.chunkBudgetMs`): reparte la carga del mapa
+  en varios frames para suavizar los tironcitos al desplazarte o entrar a zonas
+  nuevas. Más bajo = más fluido pero el terreno aparece un pelín más tarde.
+  Recomendado 4-8; `0` (o vacío) = desactivado (vanilla).
+- **Memoria** (`-Xmx`): el launcher detecta tu RAM total y sugiere un tamaño de
+  heap que puedes aceptar o cambiar. `0` (o vacío) deja el valor por defecto del
+  juego.
 
 Las descargas toleran conexiones inestables: si la transferencia se queda parada,
 se detecta y se reintenta automáticamente.

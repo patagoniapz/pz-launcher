@@ -23,9 +23,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"pzlauncher/internal/config"
 	"pzlauncher/internal/gamelaunch"
+	"pzlauncher/internal/gameopts"
 	"pzlauncher/internal/manifest"
 	"pzlauncher/internal/paths"
 	"pzlauncher/internal/selfupdate"
@@ -105,6 +107,11 @@ func main() {
 		// manifiesto mínimo para poder lanzar el juego igualmente.
 		log.Printf("[aviso] no se pudo obtener el manifiesto: %v", err)
 		m = offlineManifest()
+		// Resolver la carpeta del juego igual (best-effort) para que ajustes y
+		// autoaplicado funcionen sin conexión. Sin exit si falla.
+		if dir, derr := resolveGameDir(exeDir, &cfg, pzAppID); derr == nil {
+			gameDir = dir
+		}
 	} else {
 		if !*noSelf {
 			relaunched, err := selfupdate.MaybeUpdate(version, m, rep)
@@ -151,11 +158,14 @@ func main() {
 		case ui.ActionQuit:
 			return
 		case ui.ActionPlay:
-			launchGame(gameDir, m)
+			launchGame(gameDir, m, cfg)
 			return
 		case ui.ActionCleanLogs:
 			// Limpia y vuelve a mostrar el diálogo (no arranca el juego).
 			cleanLogs(exeDir, &cfg)
+		case ui.ActionSettings:
+			// Configura rendimiento y vuelve a mostrar el diálogo.
+			configurePerf(exeDir, gameDir, &cfg)
 		}
 	}
 }
@@ -230,11 +240,127 @@ func cleanLogs(exeDir string, cfg *config.Config) {
 	}
 }
 
-func launchGame(gameDir string, m *manifest.Manifest) {
+func launchGame(gameDir string, m *manifest.Manifest, cfg config.Config) {
+	applyGameOpts(gameDir, cfg)
 	if err := gamelaunch.Launch(gameDir, m); err != nil {
 		ui.ShowError(err.Error())
 		os.Exit(1)
 	}
+}
+
+// applyGameOpts reescribe los ajustes de rendimiento en el ProjectZomboid64.json
+// antes de cada lanzamiento (self-heal si Steam pisó el fichero). Solo actúa si
+// el jugador ya pasó por los ajustes; si no, no toca nada (comportamiento del
+// juego intacto).
+func applyGameOpts(gameDir string, cfg config.Config) {
+	if gameDir == "" || !cfg.PerfConfigured {
+		return
+	}
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB); err != nil {
+		log.Printf("[aviso] no se pudieron aplicar los ajustes de rendimiento: %v", err)
+	}
+}
+
+// configurePerf pregunta al jugador el fix anti-tirones y la memoria, guarda la
+// elección en pzlauncher.json y la aplica al ProjectZomboid64.json del juego.
+func configurePerf(exeDir, gameDir string, cfg *config.Config) {
+	if gameDir == "" {
+		ui.ShowError("No se encontró la carpeta del juego; no puedo aplicar ajustes.")
+		return
+	}
+	if _, err := os.Stat(gameopts.Path(gameDir)); err != nil {
+		ui.ShowError("No encontré ProjectZomboid64.json en:\n" + gameDir)
+		return
+	}
+
+	// 1) Fix anti-tirones (chunk budget, parche C11).
+	chunkMsg := "Tirones al moverse (fix anti-stutter)\n\n" +
+		"Reparte la carga del mapa en varios frames para suavizar los tironcitos " +
+		"al desplazarte o entrar a zonas nuevas.\n\n" +
+		"Más bajo = más fluido, pero el terreno aparece un pelín más tarde.\n" +
+		"Recomendado: 4-8.   0 (o vacío) = desactivado (vanilla)."
+	if s, ok := ui.AskText(chunkMsg, strconv.Itoa(cfg.ChunkBudgetMs)); ok {
+		cfg.ChunkBudgetMs = clamp(parseIntOr(s, cfg.ChunkBudgetMs), 0, 50)
+	}
+
+	// 2) Memoria (-Xmx).
+	ramGB := gameopts.TotalRAMGB()
+	suggest := gameopts.SuggestHeapMB()
+	defHeap := cfg.MaxHeapMB
+	if defHeap == 0 {
+		defHeap = suggest
+	}
+	ramLine := "No pude detectar tu RAM."
+	if ramGB > 0 {
+		ramLine = fmt.Sprintf("Tu PC tiene %d GB de RAM.", ramGB)
+	}
+	sugLine := ""
+	if suggest > 0 {
+		sugLine = fmt.Sprintf("   Sugerido: %d MB.", suggest)
+	}
+	memMsg := "Memoria para el juego (-Xmx, en MB)\n\n" +
+		ramLine + " PZ usa 3072 MB (3 GB) por defecto.\n" +
+		"Darle más puede reducir tirones por recolección de basura; pasarte " +
+		"puede dejar sin RAM al resto del sistema." + sugLine + "\n" +
+		"0 (o vacío) = no tocar el valor del juego."
+	if s, ok := ui.AskText(memMsg, strconv.Itoa(defHeap)); ok {
+		cfg.MaxHeapMB = clampHeap(parseIntOr(s, cfg.MaxHeapMB))
+	}
+
+	cfg.PerfConfigured = true
+	_ = config.Save(exeDir, *cfg)
+
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB); err != nil {
+		ui.ShowError("No se pudieron aplicar los ajustes: " + err.Error())
+		return
+	}
+	ui.Info(perfSummary(*cfg))
+}
+
+// perfSummary describe los ajustes aplicados para el aviso final.
+func perfSummary(cfg config.Config) string {
+	chunk := "desactivado (vanilla)"
+	if cfg.ChunkBudgetMs > 0 {
+		chunk = fmt.Sprintf("%d ms", cfg.ChunkBudgetMs)
+	}
+	heap := "sin cambios (default del juego)"
+	if cfg.MaxHeapMB > 0 {
+		heap = fmt.Sprintf("%d MB", cfg.MaxHeapMB)
+	}
+	return "Ajustes aplicados (al arrancar el juego):\n" +
+		"• Fix anti-tirones: " + chunk + "\n" +
+		"• Memoria (-Xmx): " + heap
+}
+
+// parseIntOr convierte s a entero; vacío = 0 (desactivar); inválido = def.
+func parseIntOr(s string, def int) int {
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+// clamp acota v al rango [lo, hi].
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// clampHeap acota el -Xmx: 0 = no gestionar; si no, entre 1536 y 32768 MB.
+func clampHeap(v int) int {
+	if v <= 0 {
+		return 0
+	}
+	return clamp(v, 1536, 32768)
 }
 
 // offlineManifest da el mínimo para poder lanzar el juego sin conexión.
