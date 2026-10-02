@@ -50,12 +50,13 @@ jobs:
       - name: Copiar payload del juego
         # Deja aquí los ficheros que quieras distribuir (p. ej. projectzomboid.jar).
         run: |
-          if [ -d payload ]; then cp -v payload/* dist/; fi
+          if [ -d payload ]; then cp -rv payload/* dist/; fi
 
       - name: Generar manifest.json
         run: |
           ARGS=()
           [ -f dist/projectzomboid.jar ] && ARGS+=(-game "projectzomboid.jar=dist/projectzomboid.jar")
+          [ -f dist/media/lua/client/PatagoniaFullQueueClient.lua ] && ARGS+=(-game "media/lua/client/PatagoniaFullQueueClient.lua=dist/media/lua/client/PatagoniaFullQueueClient.lua")
           go run ./tools/genmanifest \
             -release-url "${{ steps.vars.outputs.release_url }}" \
             -version "${{ steps.vars.outputs.version }}" \
@@ -77,4 +78,5 @@ jobs:
             dist/pzlauncher-darwin-arm64
             dist/manifest.json
             dist/projectzomboid.jar
+            dist/media/lua/client/PatagoniaFullQueueClient.lua
           fail_on_unmatched_files: false
