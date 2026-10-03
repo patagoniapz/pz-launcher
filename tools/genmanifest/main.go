@@ -7,6 +7,7 @@
 //	  -release-url https://github.com/OWNER/REPO/releases/download/v1.0.0 \
 //	  -version 1.0.0 \
 //	  -game projectzomboid.jar=dist/projectzomboid.jar \
+//	  -notes patchnotes.json \
 //	  -bin windows/amd64=dist/pzlauncher-windows-amd64.exe \
 //	  -bin linux/amd64=dist/pzlauncher-linux-amd64 \
 //	  -bin darwin/arm64=dist/pzlauncher-darwin-arm64 \
@@ -51,6 +52,7 @@ func main() {
 		launchLin  = flag.String("launch-linux", "./ProjectZomboid64", "ejecutable del juego en Linux")
 		launchMac  = flag.String("launch-darwin", "./ProjectZomboid64", "ejecutable del juego en macOS")
 		steamAppID = flag.Int("steam-appid", 108600, "AppID de Steam (0 = lanzar el exe en vez de vía Steam)")
+		notesFile  = flag.String("notes", "", "fichero JSON con las notas de parches (array de {id,title,desc,date})")
 	)
 	flag.Var(&gameFiles, "game", "fichero del juego: rutaRelativa=ficheroLocal (repetible)")
 	flag.Var(&binFiles, "bin", "binario del launcher: GOOS/GOARCH=ficheroLocal (repetible)")
@@ -71,6 +73,16 @@ func main() {
 			"darwin":  {Exe: *launchMac},
 		},
 		SteamAppID: *steamAppID,
+	}
+
+	if *notesFile != "" {
+		data, err := os.ReadFile(*notesFile)
+		if err != nil {
+			fail("leyendo notas %s: %v", *notesFile, err)
+		}
+		if err := json.Unmarshal(data, &m.PatchNotes); err != nil {
+			fail("parseando notas %s: %v", *notesFile, err)
+		}
 	}
 
 	for _, entry := range gameFiles {

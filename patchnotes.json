@@ -1,0 +1,38 @@
+[
+  {
+    "id": "C13",
+    "title": "Arreglo del daño de las armas de fuego",
+    "desc": "Corrige el cálculo de probabilidad de acierto y daño de las armas de fuego.",
+    "date": "2026-10-02"
+  },
+  {
+    "id": "C12",
+    "title": "Sonido de la protección de login",
+    "desc": "Corrige el aviso sonoro de la protección al conectarse (login protection).",
+    "date": "2026-10-02"
+  },
+  {
+    "id": "C11",
+    "title": "Fix anti-tirones al moverse",
+    "desc": "Reparte la carga del mapa en varios frames para suavizar los tironcitos al desplazarte o entrar a zonas nuevas. Se activa desde Ajustes de rendimiento.",
+    "date": "2026-10-02"
+  },
+  {
+    "id": "C10",
+    "title": "Menos spam de errores en los logs",
+    "desc": "Silencia errores benignos del animador (AdvancedAnimator \"visitFileFailed\") que llenaban los logs sin aportar nada.",
+    "date": "2026-10-02"
+  },
+  {
+    "id": "C9",
+    "title": "Mensaje de cola llena arreglado",
+    "desc": "Corrige el texto de posición en la cola y el aviso de servidor lleno en la pantalla de conexión (ya no aparece el \"$s\" suelto).",
+    "date": "2026-10-02"
+  },
+  {
+    "id": "C8",
+    "title": "Habilidad con armas cuerpo a cuerpo",
+    "desc": "Corrige la ganancia de experiencia/habilidad al usar armas cuerpo a cuerpo.",
+    "date": "2026-10-02"
+  }
+]

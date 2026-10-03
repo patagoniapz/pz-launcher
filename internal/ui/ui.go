@@ -34,22 +34,31 @@ const (
 	ActionCleanLogs
 	// ActionSettings: abrir los ajustes de rendimiento (sin arrancar el juego).
 	ActionSettings
+	// ActionPatchNotes: mostrar las novedades/parches (sin arrancar el juego).
+	ActionPatchNotes
 )
 
 // Etiquetas del menú principal (también usadas para mapear la elección).
 const (
 	menuPlay     = "Jugar"
 	menuSettings = "Ajustes de rendimiento"
+	menuNotes    = "Novedades (parches)"
 	menuClean    = "Limpiar logs"
 	menuQuit     = "Salir"
 )
 
-// AskAction muestra el menú principal (Jugar / Ajustes de rendimiento / Limpiar
-// logs / Salir) y devuelve la elección. Si no hay entorno gráfico, arranca el
-// juego por defecto (ActionPlay).
-func AskAction(text string) Action {
+// AskAction muestra el menú principal y devuelve la elección. La opción
+// "Novedades" solo aparece si showNotes es true (hay parches que mostrar). Si no
+// hay entorno gráfico, arranca el juego por defecto (ActionPlay).
+func AskAction(text string, showNotes bool) Action {
+	items := []string{menuPlay, menuSettings}
+	if showNotes {
+		items = append(items, menuNotes)
+	}
+	items = append(items, menuClean, menuQuit)
+
 	choice, err := zenity.List(text,
-		[]string{menuPlay, menuSettings, menuClean, menuQuit},
+		items,
 		zenity.Title(appTitle),
 		zenity.DefaultItems(menuPlay),
 		zenity.DisallowEmpty(),
@@ -64,6 +73,8 @@ func AskAction(text string) Action {
 	switch choice {
 	case menuSettings:
 		return ActionSettings
+	case menuNotes:
+		return ActionPatchNotes
 	case menuClean:
 		return ActionCleanLogs
 	case menuQuit:
@@ -76,12 +87,26 @@ func AskAction(text string) Action {
 // AskText muestra un cuadro de entrada de texto con un mensaje explicativo y un
 // valor por defecto. Devuelve el texto introducido y true, o ("", false) si el
 // usuario canceló o no hay entorno gráfico.
+//
+// OJO: el campo de entrada (zenity.Entry) tiene la etiqueta en UNA sola línea de
+// ancho fijo; un prompt largo se recorta. Para texto explicativo usa AskNumber,
+// que muestra la explicación en un cuadro aparte (que sí hace varias líneas).
 func AskText(prompt, def string) (string, bool) {
 	s, err := zenity.Entry(prompt, zenity.Title(appTitle), zenity.EntryText(def))
 	if err != nil {
 		return "", false
 	}
 	return strings.TrimSpace(s), true
+}
+
+// AskNumber pide un valor precedido de una explicación. La explicación (help,
+// que puede ocupar varias líneas) se muestra en un cuadro de información aparte
+// porque el campo de entrada recorta los textos largos; después se pide el valor
+// con una etiqueta corta (label) que SÍ cabe. Devuelve el texto y true, o
+// ("", false) si el usuario canceló el campo de entrada.
+func AskNumber(help, label, def string) (string, bool) {
+	_ = zenity.Info(help, zenity.Title(appTitle), zenity.InfoIcon, zenity.OKLabel("Continuar"))
+	return AskText(label, def)
 }
 
 // PickFolder abre un selector de carpeta. Devuelve la ruta y true si el usuario

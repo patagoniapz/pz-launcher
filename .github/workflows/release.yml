@@ -56,6 +56,7 @@ jobs:
         run: |
           ARGS=()
           [ -f dist/projectzomboid.jar ] && ARGS+=(-game "projectzomboid.jar=dist/projectzomboid.jar")
+          [ -f patchnotes.json ] && ARGS+=(-notes patchnotes.json)
           go run ./tools/genmanifest \
             -release-url "${{ steps.vars.outputs.release_url }}" \
             -version "${{ steps.vars.outputs.version }}" \

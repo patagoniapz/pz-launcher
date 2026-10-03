@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"pzlauncher/internal/config"
 	"pzlauncher/internal/gamelaunch"
@@ -152,9 +153,14 @@ func main() {
 		prompt = "Sin conexión (no se comprobaron actualizaciones)."
 	}
 	prompt += "\n¿Qué quieres hacer?"
+	// Adelanta la última novedad en el propio menú para que se vea de un vistazo.
+	if len(m.PatchNotes) > 0 {
+		prompt += "\n\nÚltima novedad: " + m.PatchNotes[0].Title
+	}
 
+	hasNotes := len(m.PatchNotes) > 0
 	for {
-		switch ui.AskAction(prompt) {
+		switch ui.AskAction(prompt, hasNotes) {
 		case ui.ActionQuit:
 			return
 		case ui.ActionPlay:
@@ -166,8 +172,38 @@ func main() {
 		case ui.ActionSettings:
 			// Configura rendimiento y vuelve a mostrar el diálogo.
 			configurePerf(exeDir, gameDir, &cfg)
+		case ui.ActionPatchNotes:
+			// Muestra las novedades y vuelve a mostrar el diálogo.
+			showPatchNotes(m)
 		}
 	}
+}
+
+// showPatchNotes muestra la lista de parches/novedades (en español) que viajan
+// en el manifiesto. Se presenta en un único cuadro de información, que sí admite
+// varias líneas y crece con el contenido.
+func showPatchNotes(m *manifest.Manifest) {
+	if m == nil || len(m.PatchNotes) == 0 {
+		ui.Info("No hay novedades disponibles (sin conexión o aún no publicadas).")
+		return
+	}
+	var b strings.Builder
+	b.WriteString("Novedades y parches aplicados\n")
+	for _, n := range m.PatchNotes {
+		b.WriteString("\n• ")
+		if n.ID != "" {
+			b.WriteString(n.ID + " — ")
+		}
+		b.WriteString(n.Title)
+		if n.Date != "" {
+			b.WriteString("  (" + n.Date + ")")
+		}
+		if n.Desc != "" {
+			b.WriteString("\n   " + n.Desc)
+		}
+		b.WriteString("\n")
+	}
+	ui.Info(b.String())
 }
 
 // resolveGameDir localiza la carpeta de instalación del juego con esta prioridad:
@@ -273,13 +309,15 @@ func configurePerf(exeDir, gameDir string, cfg *config.Config) {
 		return
 	}
 
-	// 1) Fix anti-tirones (chunk budget, parche C11).
-	chunkMsg := "Tirones al moverse (fix anti-stutter)\n\n" +
+	// 1) Fix anti-tirones (chunk budget, parche C11). La explicación va en un
+	// cuadro aparte (multilínea); el campo de entrada solo lleva una etiqueta
+	// corta porque recorta los textos largos.
+	chunkHelp := "Tirones al moverse (fix anti-stutter)\n\n" +
 		"Reparte la carga del mapa en varios frames para suavizar los tironcitos " +
 		"al desplazarte o entrar a zonas nuevas.\n\n" +
 		"Más bajo = más fluido, pero el terreno aparece un pelín más tarde.\n" +
 		"Recomendado: 4-8.   0 (o vacío) = desactivado (vanilla)."
-	if s, ok := ui.AskText(chunkMsg, strconv.Itoa(cfg.ChunkBudgetMs)); ok {
+	if s, ok := ui.AskNumber(chunkHelp, "Fix anti-tirones, ms (0 = desactivado):", strconv.Itoa(cfg.ChunkBudgetMs)); ok {
 		cfg.ChunkBudgetMs = clamp(parseIntOr(s, cfg.ChunkBudgetMs), 0, 50)
 	}
 
@@ -298,12 +336,12 @@ func configurePerf(exeDir, gameDir string, cfg *config.Config) {
 	if suggest > 0 {
 		sugLine = fmt.Sprintf("   Sugerido: %d MB.", suggest)
 	}
-	memMsg := "Memoria para el juego (-Xmx, en MB)\n\n" +
+	memHelp := "Memoria para el juego (-Xmx, en MB)\n\n" +
 		ramLine + " PZ usa 3072 MB (3 GB) por defecto.\n" +
 		"Darle más puede reducir tirones por recolección de basura; pasarte " +
 		"puede dejar sin RAM al resto del sistema." + sugLine + "\n" +
 		"0 (o vacío) = no tocar el valor del juego."
-	if s, ok := ui.AskText(memMsg, strconv.Itoa(defHeap)); ok {
+	if s, ok := ui.AskNumber(memHelp, "Memoria -Xmx, MB (0 = no tocar):", strconv.Itoa(defHeap)); ok {
 		cfg.MaxHeapMB = clampHeap(parseIntOr(s, cfg.MaxHeapMB))
 	}
 

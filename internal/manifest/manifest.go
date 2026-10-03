@@ -36,6 +36,24 @@ type Manifest struct {
 	// (steam://rungameid/<id>), lo que arranca Steam si está cerrado.
 	// Project Zomboid es 108600. Si es 0, se usa el ejecutable de Launch.
 	SteamAppID int `json:"steam_appid,omitempty"`
+
+	// PatchNotes son las novedades/parches aplicados (en español), para mostrar
+	// al jugador desde el menú "Novedades". Convención: el más nuevo primero.
+	// Viajan en el manifiesto para poder actualizarlas sin recompilar el launcher.
+	PatchNotes []PatchNote `json:"patch_notes,omitempty"`
+}
+
+// PatchNote describe un parche/novedad aplicado al juego, tal como lo ve el
+// jugador. Los textos están en español (es el idioma del usuario final).
+type PatchNote struct {
+	// ID es el identificador corto del parche, p. ej. "C13". Opcional.
+	ID string `json:"id,omitempty"`
+	// Title es un título breve de una línea.
+	Title string `json:"title"`
+	// Desc amplía qué cambia o qué arregla (puede ocupar varias líneas). Opcional.
+	Desc string `json:"desc,omitempty"`
+	// Date es la fecha del parche (YYYY-MM-DD). Opcional.
+	Date string `json:"date,omitempty"`
 }
 
 // Asset es un fichero descargable con su hash de verificación.
