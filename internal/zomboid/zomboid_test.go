@@ -14,7 +14,9 @@ func TestCleanLogs(t *testing.T) {
 	mustWrite(t, filepath.Join(dir, "Logs", "01-10-26_server.txt"), "log")
 	mustWrite(t, filepath.Join(dir, "console.txt"), "consola")
 	mustWrite(t, filepath.Join(dir, "coop-console.txt"), "consola coop")
+	mustWrite(t, filepath.Join(dir, "logs.zip"), "paquete de logs")
 	// Cosas que NO se deben tocar:
+	mustWrite(t, filepath.Join(dir, "backup.zip"), "copia del usuario")
 	mustWrite(t, filepath.Join(dir, "Saves", "partida", "map.bin"), "partida")
 	mustWrite(t, filepath.Join(dir, "mods", "mimod", "mod.info"), "mod")
 	mustWrite(t, filepath.Join(dir, "options.ini"), "opciones")
@@ -23,17 +25,19 @@ func TestCleanLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CleanLogs error: %v", err)
 	}
-	if removed != 4 {
-		t.Fatalf("esperaba borrar 4 elementos, borró %d", removed)
+	if removed != 5 {
+		t.Fatalf("esperaba borrar 5 elementos, borró %d", removed)
 	}
 
 	// Los logs deben haber desaparecido.
 	assertGone(t, filepath.Join(dir, "Logs", "01-10-26_DebugLog.txt"))
 	assertGone(t, filepath.Join(dir, "console.txt"))
 	assertGone(t, filepath.Join(dir, "coop-console.txt"))
+	assertGone(t, filepath.Join(dir, "logs.zip"))
 	// La carpeta Logs se conserva (vacía).
 	assertExists(t, filepath.Join(dir, "Logs"))
-	// Partidas, mods y opciones intactos.
+	// Partidas, mods, opciones y otros zips del usuario intactos.
+	assertExists(t, filepath.Join(dir, "backup.zip"))
 	assertExists(t, filepath.Join(dir, "Saves", "partida", "map.bin"))
 	assertExists(t, filepath.Join(dir, "mods", "mimod", "mod.info"))
 	assertExists(t, filepath.Join(dir, "options.ini"))

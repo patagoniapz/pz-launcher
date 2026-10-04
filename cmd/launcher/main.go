@@ -148,19 +148,19 @@ func main() {
 		return
 	}
 
-	prompt := "Project Zomboid está listo."
+	instruction := "Project Zomboid está listo."
 	if offline {
-		prompt = "Sin conexión (no se comprobaron actualizaciones)."
+		instruction = "Sin conexión (no se comprobaron actualizaciones)."
 	}
-	prompt += "\n¿Qué quieres hacer?"
-	// Adelanta la última novedad en el propio menú para que se vea de un vistazo.
+	// El contenido (bajo el título) adelanta la última novedad de un vistazo.
+	content := "¿Qué quieres hacer?"
 	if len(m.PatchNotes) > 0 {
-		prompt += "\n\nÚltima novedad: " + m.PatchNotes[0].Title
+		content = "Última novedad: " + m.PatchNotes[0].Title + "\n\n¿Qué quieres hacer?"
 	}
 
 	hasNotes := len(m.PatchNotes) > 0
 	for {
-		switch ui.AskAction(prompt, hasNotes) {
+		switch ui.AskAction(instruction, content, hasNotes) {
 		case ui.ActionQuit:
 			return
 		case ui.ActionPlay:
@@ -169,6 +169,9 @@ func main() {
 		case ui.ActionCleanLogs:
 			// Limpia y vuelve a mostrar el diálogo (no arranca el juego).
 			cleanLogs(exeDir, &cfg)
+		case ui.ActionOpenLogs:
+			// Abre la carpeta de logs y vuelve a mostrar el diálogo.
+			openLogsFolder(exeDir, &cfg)
 		case ui.ActionSettings:
 			// Configura rendimiento y vuelve a mostrar el diálogo.
 			configurePerf(exeDir, gameDir, &cfg)
@@ -248,19 +251,30 @@ func dirExists(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
-// cleanLogs borra los logs del cliente de la carpeta de datos de Zomboid.
+// resolveZomboidDir localiza la carpeta de DATOS de Zomboid (logs, partidas…).
 // Si no se encuentra, pide al usuario que la seleccione y recuerda la elección.
-func cleanLogs(exeDir string, cfg *config.Config) {
+// Devuelve ("", false) si no se pudo determinar. Esta es la misma carpeta que
+// se usa tanto para limpiar logs como para abrirla en el explorador.
+func resolveZomboidDir(exeDir string, cfg *config.Config) (string, bool) {
 	dir := zomboid.Resolve(cfg.ZomboidDir)
-	if !zomboid.Exists(dir) {
-		picked, ok := ui.PickFolder("Selecciona tu carpeta Zomboid (donde están los logs)")
-		if !ok {
-			ui.ShowError("No se encontró la carpeta de Zomboid; no se limpiaron logs.")
-			return
-		}
-		dir = picked
-		cfg.ZomboidDir = picked
-		_ = config.Save(exeDir, *cfg)
+	if zomboid.Exists(dir) {
+		return dir, true
+	}
+	picked, ok := ui.PickFolder("Selecciona tu carpeta Zomboid (donde están los logs)")
+	if !ok {
+		return "", false
+	}
+	cfg.ZomboidDir = picked
+	_ = config.Save(exeDir, *cfg)
+	return picked, true
+}
+
+// cleanLogs borra los logs del cliente de la carpeta de datos de Zomboid.
+func cleanLogs(exeDir string, cfg *config.Config) {
+	dir, ok := resolveZomboidDir(exeDir, cfg)
+	if !ok {
+		ui.ShowError("No se encontró la carpeta de Zomboid; no se limpiaron logs.")
+		return
 	}
 
 	removed, err := zomboid.CleanLogs(dir)
@@ -273,6 +287,19 @@ func cleanLogs(exeDir string, cfg *config.Config) {
 		ui.Info("No había logs que limpiar.")
 	} else {
 		ui.Info(fmt.Sprintf("Logs limpiados: %d elemento(s).", removed))
+	}
+}
+
+// openLogsFolder abre, en el explorador de archivos del sistema, la carpeta de
+// datos de Zomboid de ESTE usuario (la misma que se usa para limpiar los logs).
+func openLogsFolder(exeDir string, cfg *config.Config) {
+	dir, ok := resolveZomboidDir(exeDir, cfg)
+	if !ok {
+		ui.ShowError("No se encontró la carpeta de Zomboid.")
+		return
+	}
+	if err := zomboid.OpenDir(dir); err != nil {
+		ui.ShowError("No se pudo abrir la carpeta:\n" + dir + "\n\n" + err.Error())
 	}
 }
 

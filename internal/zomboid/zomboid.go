@@ -7,8 +7,11 @@
 package zomboid
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -44,8 +47,8 @@ func Exists(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
-// CleanLogs borra el contenido de <dir>/Logs y los ficheros de consola de la
-// raíz (console.txt y *-console.txt). NO toca partidas, mods ni opciones.
+// CleanLogs borra el contenido de <dir>/Logs y los ficheros de logs de la raíz
+// (console.txt, *-console.txt y logs.zip). NO toca partidas, mods ni opciones.
 // Devuelve cuántos elementos se eliminaron.
 func CleanLogs(dir string) (removed int, err error) {
 	// 1. Contenido de la carpeta Logs/ (se conserva la carpeta en sí).
@@ -58,14 +61,18 @@ func CleanLogs(dir string) (removed int, err error) {
 		}
 	}
 
-	// 2. Logs de consola sueltos en la raíz de Zomboid.
+	// 2. Logs sueltos en la raíz de Zomboid: consolas y el logs.zip (el paquete
+	// de logs comprimido que el juego deja junto a console.txt). Solo borramos
+	// ESE zip concreto, no cualquier .zip del usuario.
 	if entries, e := os.ReadDir(dir); e == nil {
 		for _, en := range entries {
 			if en.IsDir() {
 				continue
 			}
 			name := en.Name()
-			if name == "console.txt" || strings.HasSuffix(name, "-console.txt") {
+			isConsole := name == "console.txt" || strings.HasSuffix(name, "-console.txt")
+			isLogsZip := strings.EqualFold(name, "logs.zip")
+			if isConsole || isLogsZip {
 				if os.Remove(filepath.Join(dir, name)) == nil {
 					removed++
 				}
@@ -74,4 +81,22 @@ func CleanLogs(dir string) (removed int, err error) {
 	}
 
 	return removed, nil
+}
+
+// OpenDir abre dir en el explorador de archivos del sistema (cada usuario abre
+// SU carpeta de datos de Zomboid, la misma que se usa para limpiar los logs).
+func OpenDir(dir string) error {
+	if dir == "" {
+		return errors.New("ruta de carpeta vacía")
+	}
+	switch runtime.GOOS {
+	case "windows":
+		// explorer.exe suele devolver código de salida 1 aunque abra bien; por
+		// eso lanzamos sin esperar (Start) y no interpretamos el resultado.
+		return exec.Command("explorer", filepath.FromSlash(dir)).Start()
+	case "darwin":
+		return exec.Command("open", dir).Start()
+	default:
+		return exec.Command("xdg-open", dir).Start()
+	}
 }

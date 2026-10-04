@@ -36,6 +36,9 @@ const (
 	ActionSettings
 	// ActionPatchNotes: mostrar las novedades/parches (sin arrancar el juego).
 	ActionPatchNotes
+	// ActionOpenLogs: abrir la carpeta de datos de Zomboid (logs) en el
+	// explorador de archivos (sin arrancar el juego).
+	ActionOpenLogs
 )
 
 // Etiquetas del menú principal (también usadas para mapear la elección).
@@ -44,23 +47,57 @@ const (
 	menuSettings = "Ajustes de rendimiento"
 	menuNotes    = "Novedades (parches)"
 	menuClean    = "Limpiar logs"
+	menuOpenLogs = "Abrir carpeta de logs"
 	menuQuit     = "Salir"
 )
 
-// AskAction muestra el menú principal y devuelve la elección. La opción
-// "Novedades" solo aparece si showNotes es true (hay parches que mostrar). Si no
-// hay entorno gráfico, arranca el juego por defecto (ActionPlay).
-func AskAction(text string, showNotes bool) Action {
-	items := []string{menuPlay, menuSettings}
-	if showNotes {
-		items = append(items, menuNotes)
-	}
-	items = append(items, menuClean, menuQuit)
+// menuItem es una opción del menú principal: su etiqueta visible y la acción que
+// desencadena.
+type menuItem struct {
+	label  string
+	action Action
+}
 
-	choice, err := zenity.List(text,
-		items,
+// AskAction muestra el menú principal (todos los botones en una sola pantalla) y
+// devuelve la elección. La opción "Novedades" solo aparece si showNotes es true
+// (hay parches que mostrar). instruction es el título grande y content el texto
+// explicativo debajo. Si no hay entorno gráfico, arranca el juego (ActionPlay).
+func AskAction(instruction, content string, showNotes bool) Action {
+	items := []menuItem{
+		{menuPlay, ActionPlay},
+		{menuSettings, ActionSettings},
+	}
+	if showNotes {
+		items = append(items, menuItem{menuNotes, ActionPatchNotes})
+	}
+	items = append(items,
+		menuItem{menuClean, ActionCleanLogs},
+		menuItem{menuOpenLogs, ActionOpenLogs},
+		menuItem{menuQuit, ActionQuit},
+	)
+	return showMenu(instruction, content, items, ActionPlay)
+}
+
+// zenityListMenu presenta el menú como una lista nativa de zenity. Es el menú en
+// Linux/macOS y el plan B en Windows si el diálogo de botones no está disponible.
+// Al cancelar devuelve ActionQuit; sin entorno gráfico, ActionPlay.
+func zenityListMenu(instruction, content string, items []menuItem, def Action) Action {
+	labels := make([]string, len(items))
+	defLabel := items[0].label
+	for i, it := range items {
+		labels[i] = it.label
+		if it.action == def {
+			defLabel = it.label
+		}
+	}
+	text := instruction
+	if content != "" {
+		text += "\n" + content
+	}
+
+	choice, err := zenity.List(text, labels,
 		zenity.Title(appTitle),
-		zenity.DefaultItems(menuPlay),
+		zenity.DefaultItems(defLabel),
 		zenity.DisallowEmpty(),
 	)
 	if err != nil {
@@ -70,18 +107,12 @@ func AskAction(text string, showNotes bool) Action {
 		// Sin GUI disponible (p. ej. consola): comportamiento por defecto.
 		return ActionPlay
 	}
-	switch choice {
-	case menuSettings:
-		return ActionSettings
-	case menuNotes:
-		return ActionPatchNotes
-	case menuClean:
-		return ActionCleanLogs
-	case menuQuit:
-		return ActionQuit
-	default:
-		return ActionPlay
+	for _, it := range items {
+		if it.label == choice {
+			return it.action
+		}
 	}
+	return ActionPlay
 }
 
 // AskText muestra un cuadro de entrada de texto con un mensaje explicativo y un

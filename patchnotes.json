@@ -1,5 +1,11 @@
 [
   {
+    "id": "C14",
+    "title": "Nuevo botón: abrir la carpeta de logs",
+    "desc": "Añade la opción «Abrir carpeta de logs» en el menú para abrir tu carpeta de datos de Zomboid en el explorador. Además, «Limpiar logs» ahora borra también el logs.zip que deja el juego.",
+    "date": "2026-10-04"
+  },
+  {
     "id": "C13",
     "title": "Arreglo del daño de las armas de fuego",
     "desc": "Corrige el cálculo de probabilidad de acierto y daño de las armas de fuego.",
