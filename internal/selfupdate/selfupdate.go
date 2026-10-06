@@ -88,7 +88,9 @@ func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter) (relaunc
 	return true, nil
 }
 
-// CleanupOld borra el "<exe>.old" dejado por una autoactualización previa.
+// CleanupOld borra el "<exe>.old" dejado por una autoactualización previa y
+// barre los temporales de descarga (download.TempPrefix) que hubieran quedado
+// colgados en la carpeta del ejecutable por una autoactualización interrumpida.
 // Se llama al arrancar; si el .old sigue bloqueado se ignora silenciosamente.
 func CleanupOld() {
 	exe, err := os.Executable()
@@ -96,9 +98,20 @@ func CleanupOld() {
 		return
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
-	old := exe + ".old"
+	dir := filepath.Dir(exe)
 
-	// Si no hay ".old", no hay nada que hacer (caso normal, retorno inmediato).
+	// Temporales de descarga huérfanos: el binario nuevo se baja a esta misma
+	// carpeta, así que un corte a mitad puede dejar un ".pzl-download-*".
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasPrefix(e.Name(), download.TempPrefix) {
+				_ = os.Remove(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+
+	old := exe + ".old"
+	// Si no hay ".old", no hay nada más que hacer (caso normal).
 	if _, err := os.Stat(old); errors.Is(err, os.ErrNotExist) {
 		return
 	}

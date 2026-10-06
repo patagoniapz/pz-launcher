@@ -29,6 +29,12 @@ const (
 	stallTimeout = 20 * time.Second
 )
 
+// TempPrefix es el prefijo de los ficheros temporales de descarga. Se escriben
+// en la carpeta destino y se renombran al nombre final tras verificar el hash.
+// Expuesto para que los llamantes puedan barrer temporales huérfanos de una
+// ejecución interrumpida.
+const TempPrefix = ".pzl-download-"
+
 var errHashMismatch = errors.New("el hash no coincide")
 
 // Verified descarga url en un fichero temporal dentro de dir, comprueba que su
@@ -76,7 +82,7 @@ func downloadOnce(url, dir, wantHash string, onProgress func(fileDone int64)) (s
 		return "", fmt.Errorf("descargando %s: HTTP %d", url, resp.StatusCode)
 	}
 
-	tmp, err := os.CreateTemp(dir, ".pzl-download-*")
+	tmp, err := os.CreateTemp(dir, TempPrefix+"*")
 	if err != nil {
 		return "", fmt.Errorf("creando temporal: %w", err)
 	}

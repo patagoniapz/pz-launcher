@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"pzlauncher/internal/download"
@@ -19,6 +20,11 @@ import (
 // el esperado. Descarga y reemplaza únicamente los que falten o difieran.
 // baseDir es la carpeta del launcher; los paths del manifiesto son relativos a ella.
 func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
+	// 0. Barrer temporales de descarga huérfanos de una ejecución anterior que
+	//    se interrumpiera a mitad (p. ej. el launcher cerrado durante una bajada).
+	//    En funcionamiento normal no queda ninguno; esto evita que se acumulen.
+	sweepLeftoverTemps(baseDir)
+
 	// 1. Calcular el conjunto de trabajo (ficheros que cambian) y el total de
 	//    bytes, para poder mostrar un porcentaje y ETA global.
 	type job struct {
@@ -99,6 +105,22 @@ func replaceFile(dest string, f manifest.File, tr *tracker) error {
 		_ = os.Remove(bak)
 	}
 	return nil
+}
+
+// sweepLeftoverTemps borra, de forma silenciosa y best-effort, los temporales de
+// descarga (download.TempPrefix) que hubieran quedado colgados bajo root por una
+// ejecución anterior interrumpida a mitad de una bajada. No es un error que no
+// haya ninguno ni que alguno no se pueda borrar.
+func sweepLeftoverTemps(root string) {
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // carpeta ilegible: la saltamos sin abortar el barrido
+		}
+		if !d.IsDir() && strings.HasPrefix(d.Name(), download.TempPrefix) {
+			_ = os.Remove(path)
+		}
+		return nil
+	})
 }
 
 // tracker muestra el progreso agregado. Lleva por separado los bytes de los
