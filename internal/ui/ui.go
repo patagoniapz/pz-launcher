@@ -140,6 +140,26 @@ func AskNumber(help, label, def string) (string, bool) {
 	return AskText(label, def)
 }
 
+// AskYesNo muestra una pregunta con botones Sí/No y devuelve la elección del
+// usuario. def es el valor por defecto que se devuelve si no hay entorno gráfico
+// o si el usuario cierra el diálogo sin elegir (p. ej. ESC). okLabel/noLabel son
+// los textos de los botones (p. ej. "Activado"/"Desactivado").
+func AskYesNo(msg, okLabel, noLabel string, def bool) bool {
+	err := zenity.Question(msg,
+		zenity.Title(appTitle),
+		zenity.QuestionIcon,
+		zenity.OKLabel(okLabel),
+		zenity.CancelLabel(noLabel),
+	)
+	if err == nil {
+		return true // pulsó el botón OK (okLabel)
+	}
+	if errors.Is(err, zenity.ErrCanceled) {
+		return false // pulsó el botón Cancel (noLabel)
+	}
+	return def // sin GUI u otro error: valor por defecto
+}
+
 // PickFolder abre un selector de carpeta. Devuelve la ruta y true si el usuario
 // eligió una; false si canceló o no hay entorno gráfico.
 func PickFolder(title string) (string, bool) {

@@ -27,10 +27,10 @@ settings / Clean logs / Quit**. The game is started **through Steam**
 wipes `%UserProfile%\Zomboid\Logs\` and the `*console.txt` files (never your
 saves or mods).
 
-**Performance settings** let players tune two optional things without editing
-files by hand; both are **off/default** unless enabled, and the launcher writes
-them into the game's `ProjectZomboid64.json` (re-applied every launch, so a Steam
-update or "Verify integrity" can't lose them):
+**Performance settings** let players tune a few optional things without editing
+files by hand; the launcher writes them into the game's `ProjectZomboid64.json`
+(re-applied every launch, so a Steam update or "Verify integrity" can't lose
+them):
 
 - **Movement stutter fix** (`-Dpz.chunkBudgetMs`): spreads map-chunk loading over
   several frames to smooth the micro-stutters when you move or enter new areas.
@@ -38,6 +38,10 @@ update or "Verify integrity" can't lose them):
   blank) = disabled (vanilla).
 - **Memory** (`-Xmx`): the launcher detects your total RAM and suggests a heap
   size you can accept or change. `0` (or blank) leaves the game's default.
+- **Tow fix** (`-Dpz.safeTowReconnect`): stops a car towing a trailer/another car
+  from snapping back together after a desync and crashing. **On by default**
+  (recommended); turn it off only to get vanilla behavior for a test. When left
+  on, no flag is written (the jar's built-in default is on).
 
 Downloads are resilient to flaky connections: a stalled transfer is detected and
 automatically retried.
@@ -94,9 +98,8 @@ rendimiento / Limpiar logs / Salir**. El juego se lanza **vía Steam**
 borra `%UserProfile%\Zomboid\Logs\` y los `*console.txt` (nunca tus partidas ni
 mods).
 
-**Ajustes de rendimiento**: permiten al jugador configurar dos cosas opcionales
-sin editar ficheros a mano; ambas vienen **desactivadas/por defecto** salvo que
-se activen, y el launcher las escribe en el `ProjectZomboid64.json` del juego
+**Ajustes de rendimiento**: permiten al jugador configurar algunas cosas opcionales
+sin editar ficheros a mano; el launcher las escribe en el `ProjectZomboid64.json` del juego
 (reaplicadas en cada arranque, así un update de Steam o "Verificar integridad" no
 las pierde):
 
@@ -107,6 +110,11 @@ las pierde):
 - **Memoria** (`-Xmx`): el launcher detecta tu RAM total y sugiere un tamaño de
   heap que puedes aceptar o cambiar. `0` (o vacío) deja el valor por defecto del
   juego.
+- **Fix de remolque** (`-Dpz.safeTowReconnect`): evita que un auto que remolca un
+  trailer/otro auto se re-enganche de golpe tras una desincronización y provoque
+  un choque. **Activado por defecto** (recomendado); desactívalo solo para probar
+  el comportamiento vanilla. Si se deja activado no se escribe ningún flag (el jar
+  ya viene con el fix activado).
 
 Las descargas toleran conexiones inestables: si la transferencia se queda parada,
 se detecta y se reintenta automáticamente.

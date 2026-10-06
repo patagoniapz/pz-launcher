@@ -1,5 +1,11 @@
 [
   {
+    "id": "C18",
+    "title": "Fix de remolque (anti-choque al reenganchar)",
+    "desc": "Evita que un auto que remolca un trailer u otro auto se re-enganche de golpe tras una desincronización y provoque un choque entre ambos. Viene activado; se puede desactivar desde Ajustes de rendimiento.",
+    "date": "2026-10-05"
+  },
+  {
     "id": "C14",
     "title": "Nuevo botón: abrir la carpeta de logs",
     "desc": "Añade la opción «Abrir carpeta de logs» en el menú para abrir tu carpeta de datos de Zomboid en el explorador. Además, «Limpiar logs» ahora borra también el logs.zip que deja el juego.",

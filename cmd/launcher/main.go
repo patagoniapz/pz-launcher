@@ -319,7 +319,7 @@ func applyGameOpts(gameDir string, cfg config.Config) {
 	if gameDir == "" || !cfg.PerfConfigured {
 		return
 	}
-	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB); err != nil {
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB, cfg.SafeTowReconnectOff); err != nil {
 		log.Printf("[aviso] no se pudieron aplicar los ajustes de rendimiento: %v", err)
 	}
 }
@@ -372,10 +372,20 @@ func configurePerf(exeDir, gameDir string, cfg *config.Config) {
 		cfg.MaxHeapMB = clampHeap(parseIntOr(s, cfg.MaxHeapMB))
 	}
 
+	// 3) Fix de reenganche de remolque (parche C18). Viene activado; esto es un
+	// interruptor para volver a vanilla si hiciera falta diagnosticar.
+	towHelp := "Fix de remolque (anti-choque al reenganchar)\n\n" +
+		"Evita que un auto que remolca un trailer u otro auto se re-enganche de " +
+		"golpe tras una desincronización y provoque un choque entre ambos.\n\n" +
+		"Recomendado: Activado. Desactívalo solo si querés el comportamiento " +
+		"vanilla para una prueba."
+	towOn := ui.AskYesNo(towHelp, "Activado (recomendado)", "Desactivado (vanilla)", !cfg.SafeTowReconnectOff)
+	cfg.SafeTowReconnectOff = !towOn
+
 	cfg.PerfConfigured = true
 	_ = config.Save(exeDir, *cfg)
 
-	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB); err != nil {
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB, cfg.SafeTowReconnectOff); err != nil {
 		ui.ShowError("No se pudieron aplicar los ajustes: " + err.Error())
 		return
 	}
@@ -392,9 +402,14 @@ func perfSummary(cfg config.Config) string {
 	if cfg.MaxHeapMB > 0 {
 		heap = fmt.Sprintf("%d MB", cfg.MaxHeapMB)
 	}
+	tow := "activado (recomendado)"
+	if cfg.SafeTowReconnectOff {
+		tow = "desactivado (vanilla)"
+	}
 	return "Ajustes aplicados (al arrancar el juego):\n" +
 		"• Fix anti-tirones: " + chunk + "\n" +
-		"• Memoria (-Xmx): " + heap
+		"• Memoria (-Xmx): " + heap + "\n" +
+		"• Fix de remolque: " + tow
 }
 
 // parseIntOr convierte s a entero; vacío = 0 (desactivar); inválido = def.

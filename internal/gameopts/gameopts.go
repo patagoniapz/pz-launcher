@@ -7,8 +7,8 @@
 // reescribimos en cada lanzamiento, si Steam lo pisa (update / "Verificar
 // integridad") el launcher lo vuelve a aplicar solo.
 //
-// Solo tocamos NUESTRAS líneas gestionadas (-Dpz.chunkBudgetMs y, si el jugador
-// lo configuró, -Xmx); el resto de vmArgs y del fichero se preserva intacto.
+// Solo tocamos NUESTRAS líneas gestionadas (-Dpz.chunkBudgetMs, -Dpz.safeTowReconnect
+// y, si el jugador lo configuró, -Xmx); el resto de vmArgs y del fichero se preserva intacto.
 package gameopts
 
 import (
@@ -27,6 +27,11 @@ const jsonName = "ProjectZomboid64.json"
 // chunkArgPrefix es el flag gestionado del fix anti-tirones (parche C11).
 const chunkArgPrefix = "-Dpz.chunkBudgetMs="
 
+// safeTowArgPrefix es el flag gestionado del fix de reenganche de remolque sin
+// tirón (parche C18). El jar lo trae ACTIVADO por defecto; solo escribimos
+// "-Dpz.safeTowReconnect=false" cuando el jugador decide desactivarlo.
+const safeTowArgPrefix = "-Dpz.safeTowReconnect="
+
 // Path devuelve la ruta al ProjectZomboid64.json dentro de la carpeta del juego.
 func Path(gameDir string) string { return filepath.Join(gameDir, jsonName) }
 
@@ -35,9 +40,11 @@ func Path(gameDir string) string { return filepath.Join(gameDir, jsonName) }
 //     (el juego usa el default del jar, que es 0 = vanilla).
 //   - maxHeapMB > 0      -> fija "-Xmx<N>m" (reemplaza el que haya). 0 -> deja
 //     el -Xmx del juego como esté (no lo gestionamos).
+//   - safeTowOff == true -> fija "-Dpz.safeTowReconnect=false". false -> quita
+//     el flag (el jar usa su default, que es true = fix activado).
 //
 // Preserva el resto del fichero (mainClass, classpath y demás vmArgs).
-func Apply(gameDir string, chunkBudgetMs, maxHeapMB int) error {
+func Apply(gameDir string, chunkBudgetMs, maxHeapMB int, safeTowOff bool) error {
 	p := Path(gameDir)
 	data, err := os.ReadFile(p)
 	if err != nil {
@@ -59,7 +66,7 @@ func Apply(gameDir string, chunkBudgetMs, maxHeapMB int) error {
 		}
 	}
 
-	args = setVMArgs(args, chunkBudgetMs, maxHeapMB)
+	args = setVMArgs(args, chunkBudgetMs, maxHeapMB, safeTowOff)
 
 	// Volcar de vuelta como []any para el marshaling.
 	out := make([]any, len(args))
@@ -79,12 +86,15 @@ func Apply(gameDir string, chunkBudgetMs, maxHeapMB int) error {
 }
 
 // setVMArgs devuelve una copia de args con nuestras líneas gestionadas puestas al día.
-func setVMArgs(args []string, chunkBudgetMs, maxHeapMB int) []string {
-	out := make([]string, 0, len(args)+2)
+func setVMArgs(args []string, chunkBudgetMs, maxHeapMB int, safeTowOff bool) []string {
+	out := make([]string, 0, len(args)+3)
 	for _, a := range args {
 		t := strings.TrimSpace(a)
 		if strings.HasPrefix(t, chunkArgPrefix) {
 			continue // quitamos el anterior; se re-añade abajo si corresponde
+		}
+		if strings.HasPrefix(t, safeTowArgPrefix) {
+			continue // idem: lo regeneramos abajo solo si el jugador lo desactivó
 		}
 		if maxHeapMB > 0 && strings.HasPrefix(t, "-Xmx") {
 			continue // reemplazamos el -Xmx solo si el jugador lo configuró
@@ -96,6 +106,9 @@ func setVMArgs(args []string, chunkBudgetMs, maxHeapMB int) []string {
 	}
 	if chunkBudgetMs > 0 {
 		out = append(out, fmt.Sprintf("%s%d", chunkArgPrefix, chunkBudgetMs))
+	}
+	if safeTowOff {
+		out = append(out, safeTowArgPrefix+"false")
 	}
 	return out
 }

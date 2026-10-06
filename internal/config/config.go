@@ -32,6 +32,13 @@ type Config struct {
 	// MaxHeapMB es el -Xmx (MB) a fijar en el json del juego. 0 = no gestionar
 	// (dejar el valor del juego como esté).
 	MaxHeapMB int `json:"max_heap_mb,omitempty"`
+
+	// SafeTowReconnectOff desactiva el fix de reenganche de remolque sin tirón
+	// (parche C18). El jar viene con el fix ACTIVADO por defecto, así que el
+	// valor-cero (false) = fix activo y no escribimos nada en el json del juego.
+	// Solo si el jugador lo pone en true escribimos "-Dpz.safeTowReconnect=false"
+	// para volver al comportamiento vanilla (diagnóstico).
+	SafeTowReconnectOff bool `json:"safe_tow_reconnect_off,omitempty"`
 }
 
 func file(baseDir string) string {

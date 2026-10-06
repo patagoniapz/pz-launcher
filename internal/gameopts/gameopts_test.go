@@ -30,8 +30,9 @@ func countPrefix(args []string, prefix string) int {
 func TestSetVMArgs(t *testing.T) {
 	base := []string{"-Djava.awt.headless=false", "-Xmx3072m", "-Dpz.chunkBudgetMs=99"}
 
-	// chunk>0 reemplaza el flag previo (sin duplicar); heap=0 deja -Xmx intacto.
-	got := setVMArgs(base, 4, 0)
+	// chunk>0 reemplaza el flag previo (sin duplicar); heap=0 deja -Xmx intacto;
+	// safeTowOff=false NO escribe el flag (el jar usa su default = true).
+	got := setVMArgs(base, 4, 0, false)
 	if countPrefix(got, chunkArgPrefix) != 1 || !contains(got, "-Dpz.chunkBudgetMs=4") {
 		t.Fatalf("chunk no quedó en 4 único: %v", got)
 	}
@@ -41,14 +42,27 @@ func TestSetVMArgs(t *testing.T) {
 	if !contains(got, "-Djava.awt.headless=false") {
 		t.Fatalf("se perdió un arg no gestionado: %v", got)
 	}
+	if countPrefix(got, safeTowArgPrefix) != 0 {
+		t.Fatalf("safeTowOff=false no debía escribir el flag: %v", got)
+	}
 
-	// chunk=0 quita el flag (vuelve a vanilla); heap>0 reemplaza -Xmx.
-	got = setVMArgs(base, 0, 6144)
+	// chunk=0 quita el flag (vuelve a vanilla); heap>0 reemplaza -Xmx;
+	// safeTowOff=true escribe "-Dpz.safeTowReconnect=false" una sola vez.
+	got = setVMArgs(base, 0, 6144, true)
 	if countPrefix(got, chunkArgPrefix) != 0 {
 		t.Fatalf("chunk=0 debía quitar el flag: %v", got)
 	}
 	if countPrefix(got, "-Xmx") != 1 || !contains(got, "-Xmx6144m") {
 		t.Fatalf("heap no quedó en 6144 único: %v", got)
+	}
+	if countPrefix(got, safeTowArgPrefix) != 1 || !contains(got, "-Dpz.safeTowReconnect=false") {
+		t.Fatalf("safeTowOff=true no quedó en false único: %v", got)
+	}
+
+	// safeTowOff vuelve a false -> se elimina el flag previo (no se arrastra).
+	got = setVMArgs(got, 0, 0, false)
+	if countPrefix(got, safeTowArgPrefix) != 0 {
+		t.Fatalf("safeTowOff=false debía quitar el flag previo: %v", got)
 	}
 }
 
@@ -63,7 +77,7 @@ func TestApplyPreservesOtherKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Apply(dir, 5, 4096); err != nil {
+	if err := Apply(dir, 5, 4096, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,6 +101,9 @@ func TestApplyPreservesOtherKeys(t *testing.T) {
 	}
 	if !contains(args, "-Dpz.chunkBudgetMs=5") || !contains(args, "-Xmx4096m") {
 		t.Fatalf("no se aplicaron los flags: %v", args)
+	}
+	if !contains(args, "-Dpz.safeTowReconnect=false") {
+		t.Fatalf("no se aplicó el flag de remolque: %v", args)
 	}
 	if !contains(args, "-Dzomboid.steam=1") {
 		t.Fatalf("se perdió un vmArg previo: %v", args)
