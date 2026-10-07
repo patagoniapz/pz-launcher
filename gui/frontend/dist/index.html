@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PZ Launcher</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Cabecera -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">PZ</span>
+        <div>
+          <div class="title">Project Zomboid</div>
+          <div class="subtitle" id="subtitle">Launcher</div>
+        </div>
+      </div>
+      <div class="version" id="version"></div>
+    </header>
+
+    <!-- Vista: actualizando -->
+    <section id="view-updating" class="view">
+      <div class="stage" id="stage">Iniciando…</div>
+      <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+      <div class="pct" id="pct"></div>
+    </section>
+
+    <!-- Vista: error -->
+    <section id="view-error" class="view hidden">
+      <div class="error-title">Algo salió mal</div>
+      <pre class="error-msg" id="error-msg"></pre>
+      <button class="btn" data-act="quit">Salir</button>
+    </section>
+
+    <!-- Vista: menú principal -->
+    <section id="view-menu" class="view hidden">
+      <div id="offline-banner" class="banner hidden">
+        Sin conexión — no se comprobaron actualizaciones.
+      </div>
+      <div id="last-note" class="last-note hidden"></div>
+
+      <div class="menu">
+        <button class="btn btn-play" data-act="play">
+          <span class="btn-label">Jugar</span>
+          <span class="btn-sub">Arranca Project Zomboid vía Steam</span>
+        </button>
+        <button class="btn" data-act="settings">
+          <span class="btn-label">Ajustes de rendimiento</span>
+          <span class="btn-sub">Anti-tirones, memoria y fix de remolque</span>
+        </button>
+        <button class="btn" data-act="notes" id="btn-notes">
+          <span class="btn-label">Novedades (parches)</span>
+          <span class="btn-sub">Qué se ha arreglado últimamente</span>
+        </button>
+        <button class="btn" data-act="clean">
+          <span class="btn-label">Limpiar logs</span>
+          <span class="btn-sub">Borra los logs del cliente (no tus partidas)</span>
+        </button>
+        <button class="btn" data-act="openlogs">
+          <span class="btn-label">Abrir carpeta de logs</span>
+          <span class="btn-sub">Abre tu carpeta de datos de Zomboid</span>
+        </button>
+        <button class="btn btn-quit" data-act="quit">
+          <span class="btn-label">Salir</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Panel: novedades -->
+    <section id="panel-notes" class="panel hidden">
+      <div class="panel-head">
+        <h2>Novedades y parches</h2>
+        <button class="x" data-act="back">✕</button>
+      </div>
+      <div id="notes-list" class="notes-list"></div>
+    </section>
+
+    <!-- Panel: ajustes -->
+    <section id="panel-settings" class="panel hidden">
+      <div class="panel-head">
+        <h2>Ajustes de rendimiento</h2>
+        <button class="x" data-act="back">✕</button>
+      </div>
+      <div class="form">
+        <label class="field">
+          <span class="field-label">Fix anti-tirones (ms por frame)</span>
+          <span class="field-help">Reparte la carga del mapa en varios frames. Recomendado 4-8. 0 = desactivado (vanilla).</span>
+          <input type="number" id="f-chunk" min="0" max="50" />
+        </label>
+        <label class="field">
+          <span class="field-label">Memoria -Xmx (MB)</span>
+          <span class="field-help" id="ram-help"></span>
+          <input type="number" id="f-heap" min="0" max="32768" step="256" />
+        </label>
+        <label class="field field-check">
+          <input type="checkbox" id="f-tow" />
+          <span>
+            <span class="field-label">Desactivar fix de remolque (volver a vanilla)</span>
+            <span class="field-help">Déjalo desmarcado (recomendado). Marca solo para diagnosticar.</span>
+          </span>
+        </label>
+        <div class="form-actions">
+          <button class="btn btn-play" data-act="save-settings">Guardar y aplicar</button>
+          <button class="btn" data-act="back">Cancelar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Aviso flotante -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

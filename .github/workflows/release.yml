@@ -1,8 +1,16 @@
 name: release
 
 # Publica un release cuando empujas una etiqueta vX.Y.Z (p. ej. git tag v1.0.0).
-# Compila el launcher para Windows/Linux/macOS, genera el manifest.json con los
-# hashes y sube todo (binarios + manifiesto + payload) como assets del release.
+#
+# Linux y macOS usan el launcher de consola (zenity), que se compila cruzado
+# desde Linux. Windows usa la GUI de Wails, que NO se puede compilar cruzada
+# (necesita su toolchain nativo), así que se construye en un runner de Windows.
+#
+# Jobs:
+#   vars        — calcula versión y URLs una sola vez.
+#   console     — compila los 4 binarios de consola (win/linux/mac) + payload.
+#   gui-windows — compila la GUI de Wails para Windows (windows-latest).
+#   release     — junta todo, genera el manifest.json con los hashes y publica.
 on:
   push:
     tags:
@@ -12,15 +20,13 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  vars:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      release_url: ${{ steps.vars.outputs.release_url }}
+      manifest_url: ${{ steps.vars.outputs.manifest_url }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
       - name: Variables
         id: vars
         run: |
@@ -29,15 +35,26 @@ jobs:
           echo "release_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "manifest_url=https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/manifest.json" >> "$GITHUB_OUTPUT"
 
-      - name: Compilar binarios del launcher
+  console:
+    needs: vars
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Compilar binarios de consola (Linux/macOS/Windows)
         env:
-          VERSION: ${{ steps.vars.outputs.version }}
-          MANIFEST_URL: ${{ steps.vars.outputs.manifest_url }}
+          VERSION: ${{ needs.vars.outputs.version }}
+          MANIFEST_URL: ${{ needs.vars.outputs.manifest_url }}
         run: |
           mkdir -p dist
           LDFLAGS="-s -w -X main.version=${VERSION} -X main.manifestURL=${MANIFEST_URL}"
           build() {
-            # En Windows, -H windowsgui oculta la ventana de consola (usamos GUI nativa).
+            # En Windows, -H windowsgui oculta la ventana de consola. Este binario
+            # es el camino sin GUI / fallback; la GUI se compila en gui-windows.
             extra=""
             if [ "$1" = "windows" ]; then extra="-H windowsgui"; fi
             GOOS=$1 GOARCH=$2 go build -trimpath -ldflags "$extra $LDFLAGS" -o "dist/$3" ./cmd/launcher
@@ -50,7 +67,71 @@ jobs:
       - name: Copiar payload del juego
         # Deja aquí los ficheros que quieras distribuir (p. ej. projectzomboid.jar).
         run: |
-          if [ -d payload ]; then cp -v payload/* dist/; fi
+          if [ -d payload ]; then cp -v payload/* dist/ || true; fi
+
+      - name: Subir binarios de consola
+        uses: actions/upload-artifact@v4
+        with:
+          name: console
+          path: dist/
+          if-no-files-found: error
+
+  gui-windows:
+    needs: vars
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Instalar Wails CLI
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+
+      - name: Compilar la GUI de Wails (Windows)
+        shell: bash
+        env:
+          VERSION: ${{ needs.vars.outputs.version }}
+          MANIFEST_URL: ${{ needs.vars.outputs.manifest_url }}
+        working-directory: gui
+        run: |
+          # -s: no reconstruir el frontend (dist/ ya está versionado en el repo).
+          # Los -ldflags inyectan versión y URL igual que en el binario de consola.
+          wails build -s -trimpath \
+            -ldflags "-X main.version=${VERSION} -X main.manifestURL=${MANIFEST_URL}" \
+            -o pzlauncher-windows-amd64-gui.exe
+          ls -la build/bin
+
+      - name: Subir la GUI de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui
+          path: gui/build/bin/pzlauncher-windows-amd64-gui.exe
+          if-no-files-found: error
+
+  release:
+    needs: [vars, console, gui-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Descargar binarios de consola
+        uses: actions/download-artifact@v4
+        with:
+          name: console
+          path: dist
+
+      - name: Descargar la GUI de Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: gui
+          path: dist
 
       - name: Generar manifest.json
         run: |
@@ -58,10 +139,11 @@ jobs:
           [ -f dist/projectzomboid.jar ] && ARGS+=(-game "projectzomboid.jar=dist/projectzomboid.jar")
           [ -f patchnotes.json ] && ARGS+=(-notes patchnotes.json)
           go run ./tools/genmanifest \
-            -release-url "${{ steps.vars.outputs.release_url }}" \
-            -version "${{ steps.vars.outputs.version }}" \
+            -release-url "${{ needs.vars.outputs.release_url }}" \
+            -version "${{ needs.vars.outputs.version }}" \
             "${ARGS[@]}" \
             -bin windows/amd64=dist/pzlauncher-windows-amd64.exe \
+            -bin windows/amd64-gui=dist/pzlauncher-windows-amd64-gui.exe \
             -bin linux/amd64=dist/pzlauncher-linux-amd64 \
             -bin darwin/amd64=dist/pzlauncher-darwin-amd64 \
             -bin darwin/arm64=dist/pzlauncher-darwin-arm64 \
@@ -72,6 +154,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/pzlauncher-windows-amd64-gui.exe
             dist/pzlauncher-windows-amd64.exe
             dist/pzlauncher-linux-amd64
             dist/pzlauncher-darwin-amd64
