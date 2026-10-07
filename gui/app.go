@@ -1,0 +1,361 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"runtime"
+	"sync"
+
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"pzlauncher/internal/config"
+	"pzlauncher/internal/gamelaunch"
+	"pzlauncher/internal/gameopts"
+	"pzlauncher/internal/manifest"
+	"pzlauncher/internal/paths"
+	"pzlauncher/internal/selfupdate"
+	"pzlauncher/internal/updater"
+	"pzlauncher/internal/zomboid"
+)
+
+// selfUpdateVariant es el sufijo de la clave en manifest.launcher_binaries para
+// la autoactualización de ESTA GUI. El launcher de consola usa "windows/amd64";
+// la GUI usa "windows/amd64-gui" para no bajarse por error el binario de consola.
+const selfUpdateVariant = "-gui"
+
+const pzAppID = 108600 // Project Zomboid en Steam
+
+// App es el puente entre la ventana (frontend web) y la lógica del launcher
+// (paquetes internal/*). Todo el estado mutable se protege con mu porque el
+// flujo de actualización corre en una goroutine aparte mientras el frontend
+// puede llamar a los métodos ligados.
+type App struct {
+	ctx         context.Context
+	version     string
+	manifestURL string
+
+	once sync.Once
+	mu   sync.Mutex
+
+	exeDir  string
+	cfg     config.Config
+	m       *manifest.Manifest
+	gameDir string
+	offline bool
+	ready   bool
+	errMsg  string
+}
+
+// NewApp crea la App con la versión y la URL del manifiesto inyectadas en
+// compilación (ver main.go).
+func NewApp(version, manifestURL string) *App {
+	return &App{version: version, manifestURL: manifestURL}
+}
+
+// startup guarda el contexto de Wails (necesario para emitir eventos y abrir
+// diálogos nativos). Se llama antes de que cargue el frontend.
+func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+
+// --- Tipos que viajan al frontend (JSON) ---
+
+// StatePayload es el estado que el frontend necesita para pintar el menú.
+type StatePayload struct {
+	Ready      bool                 `json:"ready"`
+	Offline    bool                 `json:"offline"`
+	Version    string               `json:"version"`
+	GameDir    string               `json:"gameDir"`
+	Error      string               `json:"error"`
+	LastNote   string               `json:"lastNote"`
+	PatchNotes []manifest.PatchNote `json:"patchNotes"`
+}
+
+// SettingsPayload alimenta el formulario de "Ajustes de rendimiento".
+type SettingsPayload struct {
+	ChunkBudgetMs int  `json:"chunkBudgetMs"`
+	MaxHeapMB     int  `json:"maxHeapMB"`
+	SafeTowOff    bool `json:"safeTowOff"`
+	RAMGB         int  `json:"ramGB"`
+	SuggestHeapMB int  `json:"suggestHeapMB"`
+	DefaultHeapMB int  `json:"defaultHeapMB"`
+	Configured    bool `json:"configured"`
+	HasGameJSON   bool `json:"hasGameJSON"`
+}
+
+// --- Ciclo de vida ---
+
+// Start lo invoca el frontend UNA vez, después de registrar sus escuchas de
+// eventos, para arrancar el flujo de actualización sin perder los primeros
+// eventos de progreso. sync.Once evita que se dispare dos veces.
+func (a *App) Start() { a.once.Do(func() { go a.run() }) }
+
+// run ejecuta el flujo completo (igual que cmd/launcher) emitiendo progreso por
+// eventos de Wails en vez de por la ventana de zenity.
+func (a *App) run() {
+	rep := &wailsReporter{ctx: a.ctx}
+
+	// Limpia un posible "<exe>.old" y temporales de descarga que dejara una
+	// autoactualización anterior (igual que el launcher de consola).
+	selfupdate.CleanupOld()
+
+	exeDir, err := paths.ExecutableDir()
+	if err != nil {
+		a.fail("No se pudo determinar la carpeta del launcher: " + err.Error())
+		return
+	}
+	a.mu.Lock()
+	a.exeDir = exeDir
+	a.cfg = config.Load(exeDir)
+	a.mu.Unlock()
+	log.Printf("pzlauncher-gui %s | carpeta del exe: %s", a.version, exeDir)
+
+	url := a.manifestURL
+	if env := os.Getenv("PZL_MANIFEST_URL"); env != "" {
+		url = env
+	}
+
+	rep.Stage("Comprobando actualizaciones…")
+	m, ferr := manifest.Fetch(url)
+	offline := ferr != nil
+	var gameDir string
+	if offline {
+		// Sin conexión no debería impedir jugar: avisamos y seguimos con un
+		// manifiesto mínimo para poder lanzar el juego igualmente.
+		log.Printf("[aviso] no se pudo obtener el manifiesto: %v", ferr)
+		m = offlineManifest()
+		if dir, derr := a.resolveGameDir(exeDir, pzAppID); derr == nil {
+			gameDir = dir
+		}
+	} else {
+		// Autoactualización de la propia GUI. Usa la clave "…-gui" del manifiesto
+		// (ver selfUpdateVariant) para no bajarse el binario de consola. Si relanza,
+		// el nuevo proceso ya está en marcha y este debe cerrarse de inmediato.
+		relaunched, uerr := selfupdate.MaybeUpdate(a.version, m, rep, selfUpdateVariant)
+		if uerr != nil {
+			log.Printf("[aviso] fallo autoactualizando la GUI: %v", uerr)
+		} else if relaunched {
+			wruntime.Quit(a.ctx)
+			return
+		}
+
+		appID := m.SteamAppID
+		if appID == 0 {
+			appID = pzAppID
+		}
+		gameDir, err = a.resolveGameDir(exeDir, appID)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		log.Printf("carpeta del juego: %s", gameDir)
+		if err := updater.SyncFiles(gameDir, m.Files, rep); err != nil {
+			a.fail("Error actualizando ficheros: " + err.Error())
+			return
+		}
+	}
+
+	a.mu.Lock()
+	a.m = m
+	a.gameDir = gameDir
+	a.offline = offline
+	a.ready = true
+	a.mu.Unlock()
+
+	rep.Success("Listo")
+	wruntime.EventsEmit(a.ctx, "ready", a.GetState())
+}
+
+// fail registra el error y lo manda al frontend (que muestra la pantalla de
+// error en vez del menú).
+func (a *App) fail(msg string) {
+	log.Println("ERROR:", msg)
+	a.mu.Lock()
+	a.errMsg = msg
+	a.mu.Unlock()
+	wruntime.EventsEmit(a.ctx, "error", msg)
+}
+
+// GetState devuelve el estado actual; el frontend lo usa al arrancar (por si se
+// suscribió tarde al evento "ready") y tras recibir "ready".
+func (a *App) GetState() StatePayload {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	st := StatePayload{
+		Ready:   a.ready,
+		Offline: a.offline,
+		Version: a.version,
+		GameDir: a.gameDir,
+		Error:   a.errMsg,
+	}
+	if a.m != nil {
+		st.PatchNotes = a.m.PatchNotes
+		if len(a.m.PatchNotes) > 0 {
+			st.LastNote = a.m.PatchNotes[0].Title
+		}
+	}
+	return st
+}
+
+// --- Acciones del menú (ligadas al frontend) ---
+
+// Play aplica los ajustes y lanza el juego vía Steam; después cierra la ventana.
+func (a *App) Play() error {
+	a.mu.Lock()
+	m, gameDir, cfg := a.m, a.gameDir, a.cfg
+	a.mu.Unlock()
+	if gameDir == "" || m == nil {
+		return fmt.Errorf("No se encontró la carpeta del juego.")
+	}
+	a.applyGameOpts(gameDir, cfg)
+	if err := gamelaunch.Launch(gameDir, m); err != nil {
+		return err
+	}
+	wruntime.Quit(a.ctx)
+	return nil
+}
+
+// Quit cierra el launcher sin arrancar el juego.
+func (a *App) Quit() { wruntime.Quit(a.ctx) }
+
+// CleanLogs borra los logs del cliente y devuelve un resumen para mostrar.
+func (a *App) CleanLogs() (string, error) {
+	dir, ok := a.resolveZomboidDir()
+	if !ok {
+		return "", fmt.Errorf("No se encontró la carpeta de Zomboid; no se limpiaron logs.")
+	}
+	removed, err := zomboid.CleanLogs(dir)
+	if err != nil {
+		return "", fmt.Errorf("Error limpiando logs: %w", err)
+	}
+	log.Printf("Logs limpiados: %d elemento(s) en %s", removed, dir)
+	if removed == 0 {
+		return "No había logs que limpiar.", nil
+	}
+	return fmt.Sprintf("Logs limpiados: %d elemento(s).", removed), nil
+}
+
+// OpenLogs abre la carpeta de datos de Zomboid en el explorador.
+func (a *App) OpenLogs() error {
+	dir, ok := a.resolveZomboidDir()
+	if !ok {
+		return fmt.Errorf("No se encontró la carpeta de Zomboid.")
+	}
+	if err := zomboid.OpenDir(dir); err != nil {
+		return fmt.Errorf("No se pudo abrir la carpeta:\n%s\n\n%w", dir, err)
+	}
+	return nil
+}
+
+// GetSettings devuelve los ajustes actuales más la RAM detectada y la sugerencia
+// de heap, para prerrellenar el formulario.
+func (a *App) GetSettings() SettingsPayload {
+	a.mu.Lock()
+	cfg, gameDir := a.cfg, a.gameDir
+	a.mu.Unlock()
+	sp := SettingsPayload{
+		ChunkBudgetMs: cfg.ChunkBudgetMs,
+		MaxHeapMB:     cfg.MaxHeapMB,
+		SafeTowOff:    cfg.SafeTowReconnectOff,
+		RAMGB:         gameopts.TotalRAMGB(),
+		SuggestHeapMB: gameopts.SuggestHeapMB(),
+		Configured:    cfg.PerfConfigured,
+	}
+	sp.DefaultHeapMB = cfg.MaxHeapMB
+	if sp.DefaultHeapMB == 0 {
+		sp.DefaultHeapMB = sp.SuggestHeapMB
+	}
+	if gameDir != "" {
+		if _, err := os.Stat(gameopts.Path(gameDir)); err == nil {
+			sp.HasGameJSON = true
+		}
+	}
+	return sp
+}
+
+// SaveSettings valida, guarda en pzlauncher.json y aplica los ajustes al
+// ProjectZomboid64.json del juego. Devuelve un resumen legible.
+func (a *App) SaveSettings(chunkMs, heapMB int, towOff bool) (string, error) {
+	a.mu.Lock()
+	gameDir, exeDir, cfg := a.gameDir, a.exeDir, a.cfg
+	a.mu.Unlock()
+	if gameDir == "" {
+		return "", fmt.Errorf("No se encontró la carpeta del juego; no puedo aplicar ajustes.")
+	}
+	if _, err := os.Stat(gameopts.Path(gameDir)); err != nil {
+		return "", fmt.Errorf("No encontré ProjectZomboid64.json en:\n%s", gameDir)
+	}
+
+	cfg.ChunkBudgetMs = clamp(chunkMs, 0, 50)
+	cfg.MaxHeapMB = clampHeap(heapMB)
+	cfg.SafeTowReconnectOff = towOff
+	cfg.PerfConfigured = true
+	if err := config.Save(exeDir, cfg); err != nil {
+		return "", fmt.Errorf("No se pudo guardar la config: %w", err)
+	}
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB, cfg.SafeTowReconnectOff); err != nil {
+		return "", fmt.Errorf("No se pudieron aplicar los ajustes: %w", err)
+	}
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+	return perfSummary(cfg), nil
+}
+
+// --- Helpers (portados de cmd/launcher) ---
+
+func (a *App) applyGameOpts(gameDir string, cfg config.Config) {
+	if gameDir == "" || !cfg.PerfConfigured {
+		return
+	}
+	if err := gameopts.Apply(gameDir, cfg.ChunkBudgetMs, cfg.MaxHeapMB, cfg.SafeTowReconnectOff); err != nil {
+		log.Printf("[aviso] no se pudieron aplicar los ajustes de rendimiento: %v", err)
+	}
+}
+
+func perfSummary(cfg config.Config) string {
+	chunk := "desactivado (vanilla)"
+	if cfg.ChunkBudgetMs > 0 {
+		chunk = fmt.Sprintf("%d ms", cfg.ChunkBudgetMs)
+	}
+	heap := "sin cambios (default del juego)"
+	if cfg.MaxHeapMB > 0 {
+		heap = fmt.Sprintf("%d MB", cfg.MaxHeapMB)
+	}
+	tow := "activado (recomendado)"
+	if cfg.SafeTowReconnectOff {
+		tow = "desactivado (vanilla)"
+	}
+	return "Ajustes aplicados (al arrancar el juego):\n" +
+		"• Fix anti-tirones: " + chunk + "\n" +
+		"• Memoria (-Xmx): " + heap + "\n" +
+		"• Fix de remolque: " + tow
+}
+
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func clampHeap(v int) int {
+	if v <= 0 {
+		return 0
+	}
+	return clamp(v, 1536, 32768)
+}
+
+func offlineManifest() *manifest.Manifest {
+	exe := "ProjectZomboid64.exe"
+	if runtime.GOOS != "windows" {
+		exe = "./ProjectZomboid64"
+	}
+	return &manifest.Manifest{
+		SteamAppID: pzAppID,
+		Launch:     map[string]manifest.LaunchSpec{runtime.GOOS: {Exe: exe}},
+	}
+}

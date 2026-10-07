@@ -34,12 +34,17 @@ import (
 // nueva que current. Si es así, la descarga, la instala y relanza el proceso.
 // Devuelve relaunched=true cuando ha arrancado el nuevo binario (el llamante
 // debe terminar inmediatamente en ese caso).
-func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter) (relaunched bool, err error) {
+//
+// variant permite distinguir builds que comparten SO/arquitectura pero son
+// binarios distintos (p. ej. la GUI de Wails frente al launcher de consola en
+// Windows). Se concatena a la clave "GOOS/GOARCH" del mapa launcher_binaries:
+// "" para el binario de consola, "-gui" para la GUI (-> "windows/amd64-gui").
+func MaybeUpdate(current string, m *manifest.Manifest, rep ui.Reporter, variant string) (relaunched bool, err error) {
 	if m.LauncherVersion == "" || !isNewer(m.LauncherVersion, current) {
 		return false, nil
 	}
 
-	key := runtime.GOOS + "/" + runtime.GOARCH
+	key := runtime.GOOS + "/" + runtime.GOARCH + variant
 	asset, ok := m.LauncherBinaries[key]
 	if !ok || asset.URL == "" {
 		log.Printf("[launcher] hay versión %s pero no hay binario para %s; se omite autoactualización",

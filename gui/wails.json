@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "pzlauncher-gui",
+  "outputfilename": "pzlauncher-gui",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "Pagani Walter",
+    "email": "paganiwalter@gmail.com"
+  },
+  "info": {
+    "companyName": "Patagonia PZ",
+    "productName": "PZ Launcher",
+    "productVersion": "0.0.0"
+  }
+}

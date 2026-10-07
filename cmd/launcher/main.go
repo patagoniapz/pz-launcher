@@ -115,7 +115,7 @@ func main() {
 		}
 	} else {
 		if !*noSelf {
-			relaunched, err := selfupdate.MaybeUpdate(version, m, rep)
+			relaunched, err := selfupdate.MaybeUpdate(version, m, rep, "")
 			if err != nil {
 				log.Printf("[aviso] fallo autoactualizando el launcher: %v", err)
 			} else if relaunched {
