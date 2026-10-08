@@ -1,5 +1,11 @@
 [
   {
+    "id": "C21",
+    "title": "Autos de otros jugadores más fluidos",
+    "desc": "Suaviza cómo se ven los autos conducidos por otros: mete un poco más de margen de interpolación para que no se vean a los tirones cuando el servidor está cargado o hay jitter de red. Solo afecta a los autos ajenos (no agrega latencia al tuyo).",
+    "date": "2026-10-08"
+  },
+  {
     "id": "C18",
     "title": "Fix de remolque (anti-choque al reenganchar)",
     "desc": "Evita que un auto que remolca un trailer u otro auto se re-enganche de golpe tras una desincronización y provoque un choque entre ambos. Viene activado; se puede desactivar desde Ajustes de rendimiento.",
