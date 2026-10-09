@@ -1,5 +1,11 @@
 [
   {
+    "id": "C23",
+    "title": "La comida empieza a cocinarse al encender la estufa",
+    "desc": "Antes, al prender la estufa la barra de cocinado quedaba un rato sin moverse (parecía que no arrancaba) hasta que la comida se calentaba. Ahora la cocción empieza apenas la estufa está caliente. No cocina más rápido: solo elimina esa demora inicial. El resultado final lo sigue decidiendo el servidor.",
+    "date": "2026-10-09"
+  },
+  {
     "id": "C21",
     "title": "Autos de otros jugadores más fluidos",
     "desc": "Suaviza cómo se ven los autos conducidos por otros: mete un poco más de margen de interpolación para que no se vean a los tirones cuando el servidor está cargado o hay jitter de red. Solo afecta a los autos ajenos (no agrega latencia al tuyo).",
