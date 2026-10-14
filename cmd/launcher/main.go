@@ -365,8 +365,9 @@ func configurePerf(exeDir, gameDir string, cfg *config.Config) {
 	}
 	memHelp := "Memoria para el juego (-Xmx, en MB)\n\n" +
 		ramLine + " PZ usa 3072 MB (3 GB) por defecto.\n" +
-		"Darle más puede reducir tirones por recolección de basura; pasarte " +
-		"puede dejar sin RAM al resto del sistema." + sugLine + "\n" +
+		"PZ NO aprovecha más de ~3-4 GB: darle más NO mejora y normalmente " +
+		"EMPEORA (menos FPS y tirones), porque le quita memoria a la placa de " +
+		"video. Tener mucha RAM en la PC no cambia esto." + sugLine + "\n" +
 		"0 (o vacío) = no tocar el valor del juego."
 	if s, ok := ui.AskNumber(memHelp, "Memoria -Xmx, MB (0 = no tocar):", strconv.Itoa(defHeap)); ok {
 		cfg.MaxHeapMB = clampHeap(parseIntOr(s, cfg.MaxHeapMB))
@@ -453,12 +454,15 @@ func clamp(v, lo, hi int) int {
 	return v
 }
 
-// clampHeap acota el -Xmx: 0 = no gestionar; si no, entre 1536 y 32768 MB.
+// clampHeap acota el -Xmx: 0 = no gestionar; si no, entre 1536 y 6144 MB.
+// Tope en 6144: PZ (con ZGC) rinde PEOR con heap grande (infla la RAM residente
+// y le roba memoria a la GPU/streaming); el working set real es ~3-4 GB. No tiene
+// sentido permitir 8/16/32 GB aunque la PC los tenga -> solo haría daño.
 func clampHeap(v int) int {
 	if v <= 0 {
 		return 0
 	}
-	return clamp(v, 1536, 32768)
+	return clamp(v, 1536, 6144)
 }
 
 // clampGrid normaliza el ancho de grilla de chunks: 0 = sin tope (vanilla);

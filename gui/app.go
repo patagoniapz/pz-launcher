@@ -363,7 +363,9 @@ func clampHeap(v int) int {
 	if v <= 0 {
 		return 0
 	}
-	return clamp(v, 1536, 32768)
+	// Tope en 6144: PZ (con ZGC) rinde PEOR con heap grande (infla la RAM
+	// residente y le roba memoria a la GPU/streaming); working set real ~3-4 GB.
+	return clamp(v, 1536, 6144)
 }
 
 func offlineManifest() *manifest.Manifest {

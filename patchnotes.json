@@ -1,5 +1,17 @@
 [
   {
+    "id": "C28",
+    "title": "Menos tirones: tope de RAM del juego (no le pongas de más)",
+    "desc": "Mucha gente le asignaba 8, 16 o 32 GB al juego pensando que iba a ir mejor, y es al revés: PZ no aprovecha más de ~3-4 GB y con más RAM anda PEOR (menos FPS y tirones, porque le roba memoria a la placa de video). Ahora el launcher sugiere 4 GB y no deja pasar de 6 GB. Si tenías un valor más alto, se baja solo al aplicar los ajustes. Tener mucha RAM en la PC está perfecto; el juego igual se queda en ~4 GB.",
+    "date": "2026-10-14"
+  },
+  {
+    "id": "C18b",
+    "title": "Fix de cierre del juego al reenganchar remolques",
+    "desc": "En algunos casos, al reconectar un auto con remolque tras una desincronización, el juego podía CERRARSE de golpe (crash). Se agregó una protección para que eso no pase (si la física del remolcado no está lista, simplemente no reposiciona). No cambia nada de lo que ves.",
+    "date": "2026-10-14"
+  },
+  {
     "id": "C27",
     "title": "Nombre de la habilidad en español al subir de nivel",
     "desc": "Al subir un nivel de una habilidad, el cartelito sobre tu personaje mostraba el nombre en inglés (porque lo arma el servidor). Ahora se muestra en tu idioma. Solo afecta habilidades base del juego.",

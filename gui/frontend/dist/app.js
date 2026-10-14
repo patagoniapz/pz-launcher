@@ -114,7 +114,7 @@ async function openSettings() {
     $("f-tow").checked = !!s.safeTowOff;
     const ramLine = s.ramGB > 0 ? `Tu PC tiene ${s.ramGB} GB de RAM.` : "No pude detectar tu RAM.";
     const sug = s.suggestHeapMB > 0 ? ` Sugerido: ${s.suggestHeapMB} MB.` : "";
-    $("ram-help").textContent = `${ramLine} PZ usa 3072 MB por defecto.${sug} 0 = no tocar.`;
+    $("ram-help").textContent = `${ramLine} PZ usa 3072 MB por defecto y NO aprovecha más de ~4 GB: darle más empeora el rendimiento (le roba memoria a la placa de video).${sug} 0 = no tocar.`;
     if (!s.hasGameJSON) {
       toast("Ojo: no encontré ProjectZomboid64.json; los ajustes no se podrán aplicar.", "err");
     }

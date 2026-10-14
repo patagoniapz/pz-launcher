@@ -127,25 +127,22 @@ func setVMArgs(args []string, chunkBudgetMs, maxHeapMB, maxChunkGridWidth int, s
 	return out
 }
 
-// SuggestHeapMB sugiere un -Xmx (en MB) según la RAM física total, dejando
-// margen para el SO. Devuelve 0 si no se pudo detectar la RAM. El cliente de PZ
-// rara vez aprovecha más de 8 GB, así que ahí topamos.
+// SuggestHeapMB sugiere un -Xmx (en MB). El working set real del cliente de PZ
+// es ~3-4 GB: con ZGC (el GC que usa PZ) un heap más grande NO ayuda y encima
+// PERJUDICA (difiere la recolección -> infla la RAM residente -> le roba memoria
+// a la GPU/streaming -> menos FPS y tirones). Por eso NUNCA sugerimos más de
+// 4 GB, sin importar cuánta RAM física haya (32 GB de sistema != heap de 32 GB).
+// Devuelve 0 si no se pudo detectar la RAM.
 func SuggestHeapMB() int {
 	total := sysmem.TotalBytes()
 	if total == 0 {
 		return 0
 	}
 	gib := float64(total) / (1024 * 1024 * 1024)
-	switch {
-	case gib < 7.5: // equipos de ~8 GB: no ahogar al SO
+	if gib < 7.5 { // equipos de ~8 GB: no ahogar al SO
 		return 3072
-	case gib < 15: // ~8-16 GB
-		return 4096
-	case gib < 31: // ~16-32 GB
-		return 6144
-	default: // 32 GB o más
-		return 8192
 	}
+	return 4096 // 8 GB+ : el sweet spot de PZ; más heap empeora el rendimiento
 }
 
 // TotalRAMGB devuelve la RAM física total redondeada a GB (0 si no se detectó).
