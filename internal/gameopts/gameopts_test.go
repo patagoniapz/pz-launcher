@@ -77,6 +77,71 @@ func TestSetVMArgs(t *testing.T) {
 	}
 }
 
+func TestSetVMArgsStripsInjection(t *testing.T) {
+	base := []string{
+		"-Dzomboid.steam=1",
+		"-Xmx3072m",
+		"-javaagent:C:\\cheat\\trainer.jar",
+		"-agentpath:C:\\cheat\\native.dll",
+		"-agentlib:jdwp=transport=dt_socket",
+		"-Xbootclasspath/a:C:\\cheat\\shadow.jar",
+		"-XX:+UseZGC",
+	}
+	got := setVMArgs(base, 0, 0, 0, false)
+	for _, bad := range []string{"-javaagent", "-agentpath", "-agentlib", "-Xbootclasspath"} {
+		if countPrefix(got, bad) != 0 {
+			t.Fatalf("no se eliminó el vector de inyección %q: %v", bad, got)
+		}
+	}
+	// los flags legítimos del juego se conservan
+	if !contains(got, "-Dzomboid.steam=1") || !contains(got, "-Xmx3072m") || !contains(got, "-XX:+UseZGC") {
+		t.Fatalf("se perdió un flag legítimo: %v", got)
+	}
+}
+
+func TestApplySanitizesClasspath(t *testing.T) {
+	dir := t.TempDir()
+	src := `{
+	"mainClass": "zombie/gameStates/MainScreenState",
+	"classpath": ["java/.", "java/projectzomboid.jar", "C:/cheat/injector.jar", "mods/hack.jar"],
+	"vmArgs": ["-Dzomboid.steam=1", "-javaagent:C:/cheat/trainer.jar"]
+}`
+	if err := os.WriteFile(filepath.Join(dir, jsonName), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(dir, 0, 0, 0, false); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, jsonName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatal(err)
+	}
+	var cp []string
+	for _, v := range root["classpath"].([]any) {
+		cp = append(cp, v.(string))
+	}
+	if !contains(cp, "java/.") || !contains(cp, "java/projectzomboid.jar") {
+		t.Fatalf("se perdió una entrada legítima del classpath: %v", cp)
+	}
+	if contains(cp, "C:/cheat/injector.jar") || contains(cp, "mods/hack.jar") {
+		t.Fatalf("no se descartó un .jar ajeno del classpath: %v", cp)
+	}
+	var args []string
+	for _, v := range root["vmArgs"].([]any) {
+		args = append(args, v.(string))
+	}
+	if countPrefix(args, "-javaagent") != 0 {
+		t.Fatalf("no se eliminó el -javaagent del json: %v", args)
+	}
+	if !contains(args, "-Dzomboid.steam=1") {
+		t.Fatalf("se perdió un vmArg legítimo: %v", args)
+	}
+}
+
 func TestApplyPreservesOtherKeys(t *testing.T) {
 	dir := t.TempDir()
 	src := `{

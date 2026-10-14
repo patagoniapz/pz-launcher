@@ -38,6 +38,50 @@ const safeTowArgPrefix = "-Dpz.safeTowReconnect="
 // eligió un tope (>= 12).
 const maxGridArgPrefix = "-Dpz.maxChunkGridWidth="
 
+// allowedJarName es el ÚNICO .jar permitido en el classpath del cliente. El
+// launcher descarta del classpath cualquier otro .jar (vector de inyección de
+// código de terceros), conservando directorios y el jar del juego.
+const allowedJarName = "projectzomboid.jar"
+
+// injectionArgPrefixes son flags de JVM que permiten cargar o instrumentar
+// código de terceros EN MEMORIA (agentes Java/nativos, shadowing de clases por
+// bootclasspath) — la vía típica de los cheats que se inyectan editando el
+// ProjectZomboid64.json. El launcher los ELIMINA del json en CADA lanzamiento:
+// nunca forman parte de nuestras opciones gestionadas. El servidor además los
+// rechaza en el login (defensa en profundidad; ver PatagoniaIntegrity).
+var injectionArgPrefixes = []string{
+	"-javaagent",
+	"-agentpath",
+	"-agentlib",
+	"-Xbootclasspath",
+}
+
+// isInjectionArg indica si un vmArg es un vector de inyección de código a quitar.
+func isInjectionArg(arg string) bool {
+	lower := strings.ToLower(strings.TrimSpace(arg))
+	for _, p := range injectionArgPrefixes {
+		if strings.HasPrefix(lower, strings.ToLower(p)) {
+			return true
+		}
+	}
+	return false
+}
+
+// isForeignClasspathEntry indica si una entrada del classpath es un .jar ajeno
+// (a descartar). Conserva directorios ("java/.", ".") y el jar del juego.
+func isForeignClasspathEntry(entry string) bool {
+	e := strings.TrimSpace(strings.ReplaceAll(entry, "\\", "/"))
+	base := e
+	if i := strings.LastIndex(e, "/"); i >= 0 {
+		base = e[i+1:]
+	}
+	base = strings.ToLower(strings.TrimSpace(base))
+	if base == "" || !strings.HasSuffix(base, ".jar") {
+		return false // directorios o entradas no-jar: se conservan
+	}
+	return base != allowedJarName
+}
+
 // Path devuelve la ruta al ProjectZomboid64.json dentro de la carpeta del juego.
 func Path(gameDir string) string { return filepath.Join(gameDir, jsonName) }
 
@@ -83,6 +127,20 @@ func Apply(gameDir string, chunkBudgetMs, maxHeapMB, maxChunkGridWidth int, safe
 	}
 	root["vmArgs"] = out
 
+	// Sanear el classpath: descartar cualquier .jar ajeno que se haya colado
+	// (inyección de código vía classpath); conservar directorios y el jar del
+	// juego. Si alguien editó el json a mano para sumar un cheat.jar, aquí se va.
+	if raw, ok := root["classpath"].([]any); ok {
+		cp := make([]any, 0, len(raw))
+		for _, v := range raw {
+			if s, ok := v.(string); ok && isForeignClasspathEntry(s) {
+				continue
+			}
+			cp = append(cp, v)
+		}
+		root["classpath"] = cp
+	}
+
 	buf, err := json.MarshalIndent(root, "", "\t")
 	if err != nil {
 		return err
@@ -109,6 +167,9 @@ func setVMArgs(args []string, chunkBudgetMs, maxHeapMB, maxChunkGridWidth int, s
 		}
 		if maxHeapMB > 0 && strings.HasPrefix(t, "-Xmx") {
 			continue // reemplazamos el -Xmx solo si el jugador lo configuró
+		}
+		if isInjectionArg(t) {
+			continue // agente/bootclasspath inyectado a mano: nunca se propaga
 		}
 		out = append(out, a)
 	}

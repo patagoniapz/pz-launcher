@@ -209,6 +209,24 @@ func (a *App) Play() error {
 		return fmt.Errorf("No se encontró la carpeta del juego.")
 	}
 	a.applyGameOpts(gameDir, cfg)
+
+	// Respaldo + limpieza de logs del cliente (best-effort; NUNCA bloquea el
+	// arranque). Antes de lanzar, guardamos la sesión anterior en un .zip con
+	// fecha (carpeta patagoniapz/, últimos 10) y dejamos los logs limpios para
+	// la nueva sesión. Solo corre por el launcher; si entran por Steam, no.
+	if zdir := zomboid.Resolve(cfg.ZomboidDir); zomboid.Exists(zdir) {
+		if zipPath, n, err := zomboid.BackupLogs(zdir); err != nil {
+			log.Printf("[aviso] no se pudo respaldar los logs: %v", err)
+		} else if n > 0 {
+			log.Printf("[logs] respaldados %d fichero(s) en %s", n, zipPath)
+		}
+		if removed, err := zomboid.CleanLogs(zdir); err != nil {
+			log.Printf("[aviso] no se pudieron limpiar los logs: %v", err)
+		} else if removed > 0 {
+			log.Printf("[logs] limpiados %d elemento(s)", removed)
+		}
+	}
+
 	if err := gamelaunch.Launch(gameDir, m); err != nil {
 		return err
 	}
