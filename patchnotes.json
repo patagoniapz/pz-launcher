@@ -1,5 +1,10 @@
 [
   {
+    "title": "Logs más limpios: respaldo y limpieza automática al jugar",
+    "desc": "Al darle a Jugar, el launcher guarda los logs de la sesión anterior en un .zip con la fecha (dentro de tu carpeta Zomboid, subcarpeta patagoniapz; se conservan los últimos 10) y deja los logs limpios para la sesión nueva. Si después hay que revisar un problema, queda el respaldo, pero sin acumular basura. No tenés que borrar nada a mano. Solo pasa al entrar por el launcher.",
+    "date": "2026-10-14"
+  },
+  {
     "id": "C28",
     "title": "Menos tirones: tope de RAM del juego (no le pongas de más)",
     "desc": "Mucha gente le asignaba 8, 16 o 32 GB al juego pensando que iba a ir mejor, y es al revés: PZ no aprovecha más de ~3-4 GB y con más RAM anda PEOR (menos FPS y tirones, porque le roba memoria a la placa de video). Ahora el launcher sugiere 4 GB y no deja pasar de 6 GB. Si tenías un valor más alto, se baja solo al aplicar los ajustes. Tener mucha RAM en la PC está perfecto; el juego igual se queda en ~4 GB.",
