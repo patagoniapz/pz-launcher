@@ -1,5 +1,10 @@
 [
   {
+    "title": "Seguridad: vínculo cliente–servidor actualizado",
+    "desc": "Actualizamos la verificación interna que une tu cliente con el servidor oficial. Es un cambio de seguridad (nada cambia en cómo jugás); solo asegurate de entrar siempre por el launcher para tener el cliente al día.",
+    "date": "2026-10-14"
+  },
+  {
     "title": "Logs más limpios: respaldo y limpieza automática al jugar",
     "desc": "Al darle a Jugar, el launcher guarda los logs de la sesión anterior en un .zip con la fecha (dentro de tu carpeta Zomboid, subcarpeta patagoniapz; se conservan los últimos 10) y deja los logs limpios para la sesión nueva. Si después hay que revisar un problema, queda el respaldo, pero sin acumular basura. No tenés que borrar nada a mano. Solo pasa al entrar por el launcher.",
     "date": "2026-10-14"
