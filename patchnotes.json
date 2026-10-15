@@ -1,5 +1,11 @@
 [
   {
+    "id": "C31",
+    "title": "Cocina: la barra de cocción ya no se congela ni salta de golpe",
+    "desc": "Al cocinar en horno/estufa, a veces la barra no arrancaba, de repente aparecía más de media llena, y la comida terminaba quemada sin aviso. El servidor sí estaba cocinando bien: tu cliente perdía las actualizaciones de progreso en silencio. Ahora las recupera siempre, así que la barra avanza parejita desde el inicio y lo que ves es el estado real de la comida. Si cocinás, vas a notar la diferencia enseguida.",
+    "date": "2026-10-15"
+  },
+  {
     "title": "Actualización obligatoria: entrá por el launcher",
     "desc": "Con la actualización de hoy del servidor, los clientes anteriores dejan de ser aceptados al conectar. Abrí el launcher y dale a Jugar para recibir el cliente nuevo automáticamente; con eso entrás normal. Si el juego te dice 'acceso denegado', es esto: entrá una vez por el launcher y listo.",
     "date": "2026-10-15"
