@@ -1,5 +1,11 @@
 [
   {
+    "id": "C29",
+    "title": "Arreglado: el juego dejaba de responder para todos a la vez",
+    "desc": "Encontramos y cerramos la causa de los cuelgues masivos de anoche: un paquete de sonido malformado (enviado por un cliente desactualizado) hacia que el juego de TODOS los conectados se congelara al mismo tiempo. Ahora tu cliente descarta esos paquetes y el servidor deja de reenviarlos. Si anoche se te colgaba el juego, con esta version queda resuelto. Entra siempre por el launcher para recibirla.",
+    "date": "2026-10-15"
+  },
+  {
     "title": "Seguridad: vínculo cliente–servidor actualizado",
     "desc": "Actualizamos la verificación interna que une tu cliente con el servidor oficial. Es un cambio de seguridad (nada cambia en cómo jugás); solo asegurate de entrar siempre por el launcher para tener el cliente al día.",
     "date": "2026-10-14"
