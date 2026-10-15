@@ -1,5 +1,10 @@
 [
   {
+    "title": "Actualización obligatoria: entrá por el launcher",
+    "desc": "Con la actualización de hoy del servidor, los clientes anteriores dejan de ser aceptados al conectar. Abrí el launcher y dale a Jugar para recibir el cliente nuevo automáticamente; con eso entrás normal. Si el juego te dice 'acceso denegado', es esto: entrá una vez por el launcher y listo.",
+    "date": "2026-10-15"
+  },
+  {
     "id": "C30",
     "title": "¡Ahora podés palear la nieve!",
     "desc": "Llega el invierno y con él una herramienta nueva: con una pala en el inventario, hacé click derecho sobre una casilla nevada al aire libre y elegí 'Quitar nieve' para despejarla y ver el suelo de abajo (tierra, pasto, asfalto...). La pala de nieve palea más rápido que una pala común. Lo que paleás lo ven también los demás jugadores, y una nevada fresca lo vuelve a cubrir con el tiempo, como corresponde. Requiere entrar por el launcher para tener el cliente al día.",
