@@ -1,5 +1,11 @@
 [
   {
+    "id": "C30",
+    "title": "¡Ahora podés palear la nieve!",
+    "desc": "Llega el invierno y con él una herramienta nueva: con una pala en el inventario, hacé click derecho sobre una casilla nevada al aire libre y elegí 'Quitar nieve' para despejarla y ver el suelo de abajo (tierra, pasto, asfalto...). La pala de nieve palea más rápido que una pala común. Lo que paleás lo ven también los demás jugadores, y una nevada fresca lo vuelve a cubrir con el tiempo, como corresponde. Requiere entrar por el launcher para tener el cliente al día.",
+    "date": "2026-10-15"
+  },
+  {
     "id": "C29",
     "title": "Arreglado: el juego dejaba de responder para todos a la vez",
     "desc": "Encontramos y cerramos la causa de los cuelgues masivos de anoche: un paquete de sonido malformado (enviado por un cliente desactualizado) hacia que el juego de TODOS los conectados se congelara al mismo tiempo. Ahora tu cliente descarta esos paquetes y el servidor deja de reenviarlos. Si anoche se te colgaba el juego, con esta version queda resuelto. Entra siempre por el launcher para recibirla.",
