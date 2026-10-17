@@ -164,6 +164,18 @@ func main() {
 		case ui.ActionQuit:
 			return
 		case ui.ActionPlay:
+			// Revalidar JUSTO antes de jugar: entre el arranque del launcher y
+			// el click en "Jugar" pudo publicarse un jar nuevo (token rotado) o
+			// algo pudo pisar los ficheros. Si justo ahora no hay red, se lanza
+			// con lo validado al arranque (mismo espíritu que el modo offline).
+			if gameDir != "" {
+				if fresh, err := revalidate(url, gameDir); err != nil {
+					ui.ShowError("Error actualizando ficheros: " + err.Error())
+					continue // volver al menú sin lanzar el juego
+				} else if fresh != nil {
+					m = fresh
+				}
+			}
 			launchGame(gameDir, m, cfg)
 			return
 		case ui.ActionCleanLogs:
@@ -180,6 +192,25 @@ func main() {
 			showPatchNotes(m)
 		}
 	}
+}
+
+// revalidate refresca el manifiesto y re-sincroniza los ficheros del juego.
+// Devuelve el manifiesto fresco, o (nil, nil) si no se pudo descargar (sin red
+// en este momento): en ese caso no se bloquea el juego y se lanza con lo que
+// se validó al arrancar.
+func revalidate(url, gameDir string) (*manifest.Manifest, error) {
+	fresh, err := manifest.Fetch(url)
+	if err != nil {
+		log.Printf("[aviso] no se pudo refrescar el manifiesto antes de jugar: %v", err)
+		return nil, nil
+	}
+	rep := ui.New()
+	defer rep.Close()
+	rep.Stage("Verificando ficheros…")
+	if err := updater.SyncFiles(gameDir, fresh.Files, rep); err != nil {
+		return nil, err
+	}
+	return fresh, nil
 }
 
 // showPatchNotes muestra la lista de parches/novedades (en español) que viajan
@@ -236,9 +267,10 @@ func resolveGameDir(exeDir string, cfg *config.Config, appID int) (string, error
 	return "", errors.New("No se encontró la carpeta de instalación de Project Zomboid.")
 }
 
-// hasGameExe indica si dir parece la carpeta del juego (contiene su ejecutable).
+// hasGameExe indica si dir parece la carpeta del juego: contiene su ejecutable
+// (Windows/Linux) o el bundle de la app (macOS).
 func hasGameExe(dir string) bool {
-	for _, name := range []string{"ProjectZomboid64.exe", "ProjectZomboid64"} {
+	for _, name := range []string{"ProjectZomboid64.exe", "ProjectZomboid64", "Project Zomboid.app"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 			return true
 		}

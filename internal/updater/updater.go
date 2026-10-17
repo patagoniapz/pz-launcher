@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
 	var jobs []job
 	var totalBytes int64
 	for _, f := range files {
-		dest := filepath.Join(baseDir, filepath.FromSlash(f.Path))
+		dest := resolveDest(runtime.GOOS, baseDir, f.Path)
 		local, err := hashutil.SHA256File(dest)
 		if err != nil {
 			return fmt.Errorf("hash local de %s: %w", f.Path, err)
@@ -60,6 +61,50 @@ func SyncFiles(baseDir string, files []manifest.File, rep ui.Reporter) error {
 	}
 	rep.Progress(totalBytes, totalBytes)
 	return nil
+}
+
+// destCandidates lista, en orden de preferencia, dónde puede vivir un fichero
+// del manifiesto según el SO. En Windows los ficheros del juego cuelgan de la
+// raíz de la instalación; en macOS el juego vive dentro del bundle
+// (Project Zomboid.app/Contents/Java), y en Linux hay instalaciones con los
+// ficheros Java bajo la subcarpeta projectzomboid/.
+func destCandidates(goos, baseDir, relPath string) []string {
+	rel := filepath.FromSlash(relPath)
+	switch goos {
+	case "darwin":
+		return []string{
+			filepath.Join(baseDir, "Project Zomboid.app", "Contents", "Java", rel),
+			filepath.Join(baseDir, rel),
+		}
+	case "linux":
+		return []string{
+			filepath.Join(baseDir, rel),
+			filepath.Join(baseDir, "projectzomboid", rel),
+		}
+	default:
+		return []string{filepath.Join(baseDir, rel)}
+	}
+}
+
+// resolveDest elige el destino real de un fichero del manifiesto:
+//  1. Donde ya exista una copia (esa es la que carga el juego y la que hay que
+//     mantener al día). Si existiera en varias, gana el orden de destCandidates.
+//  2. Si no existe en ninguna, el primer candidato cuya carpeta padre ya exista
+//     (p. ej. Contents/Java dentro del .app en macOS).
+//  3. En último término, la raíz de la instalación (comportamiento histórico).
+func resolveDest(goos, baseDir, relPath string) string {
+	cands := destCandidates(goos, baseDir, relPath)
+	for _, c := range cands {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return c
+		}
+	}
+	for _, c := range cands {
+		if info, err := os.Stat(filepath.Dir(c)); err == nil && info.IsDir() {
+			return c
+		}
+	}
+	return filepath.Join(baseDir, filepath.FromSlash(relPath))
 }
 
 // replaceFile descarga el fichero a un temporal (verificando su hash), hace una

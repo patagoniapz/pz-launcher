@@ -84,6 +84,76 @@ func TestSyncFiles_SkipsWhenUpToDate(t *testing.T) {
 	}
 }
 
+func TestResolveDest_WindowsUsesRoot(t *testing.T) {
+	base := t.TempDir()
+	got := resolveDest("windows", base, "projectzomboid.jar")
+	want := filepath.Join(base, "projectzomboid.jar")
+	if got != want {
+		t.Fatalf("resolveDest = %q, se esperaba %q", got, want)
+	}
+}
+
+func TestResolveDest_DarwinPrefersExistingBundleCopy(t *testing.T) {
+	base := t.TempDir()
+	javaDir := filepath.Join(base, "Project Zomboid.app", "Contents", "Java")
+	if err := os.MkdirAll(javaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	jar := filepath.Join(javaDir, "projectzomboid.jar")
+	if err := os.WriteFile(jar, []byte("jar del bundle"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := resolveDest("darwin", base, "projectzomboid.jar"); got != jar {
+		t.Fatalf("resolveDest = %q, se esperaba el jar del bundle %q", got, jar)
+	}
+}
+
+func TestResolveDest_DarwinPlacesNewFileInsideBundle(t *testing.T) {
+	base := t.TempDir()
+	javaDir := filepath.Join(base, "Project Zomboid.app", "Contents", "Java")
+	if err := os.MkdirAll(javaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// El jar no existe todavía en ningún candidato: debe ir al bundle porque
+	// su carpeta ya existe.
+	want := filepath.Join(javaDir, "projectzomboid.jar")
+	if got := resolveDest("darwin", base, "projectzomboid.jar"); got != want {
+		t.Fatalf("resolveDest = %q, se esperaba %q", got, want)
+	}
+}
+
+func TestResolveDest_DarwinWithoutBundleFallsBackToRoot(t *testing.T) {
+	base := t.TempDir()
+	want := filepath.Join(base, "projectzomboid.jar")
+	if got := resolveDest("darwin", base, "projectzomboid.jar"); got != want {
+		t.Fatalf("resolveDest = %q, se esperaba la raíz %q", got, want)
+	}
+}
+
+func TestResolveDest_LinuxPrefersExistingCopyInSubdir(t *testing.T) {
+	base := t.TempDir()
+	sub := filepath.Join(base, "projectzomboid")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	jar := filepath.Join(sub, "projectzomboid.jar")
+	if err := os.WriteFile(jar, []byte("jar en subcarpeta"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveDest("linux", base, "projectzomboid.jar"); got != jar {
+		t.Fatalf("resolveDest = %q, se esperaba %q", got, jar)
+	}
+	// Y si existe en la raíz, la raíz tiene prioridad (orden de candidatos).
+	root := filepath.Join(base, "projectzomboid.jar")
+	if err := os.WriteFile(root, []byte("jar en la raíz"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveDest("linux", base, "projectzomboid.jar"); got != root {
+		t.Fatalf("resolveDest = %q, se esperaba %q", got, root)
+	}
+}
+
 func TestSyncFiles_FailsOnHashMismatch(t *testing.T) {
 	content := []byte("contenido real")
 	srv := serveContent(t, content)

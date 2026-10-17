@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -80,9 +82,27 @@ type LaunchSpec struct {
 }
 
 // Fetch descarga y decodifica el manifiesto desde una URL.
+//
+// La petición rompe cachés intermedias (CDN/proxies): justo después de publicar
+// un release, una copia cacheada del manifiesto haría que el launcher validara
+// contra los hashes VIEJOS y dijera "todo al día" cuando el servidor ya exige el
+// jar nuevo. Un parámetro único por petición cambia la clave de caché, y las
+// cabeceras piden contenido fresco a las cachés que las respetan.
 func Fetch(url string) (*Manifest, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	req, err := http.NewRequest(http.MethodGet, url+sep+"ts="+strconv.FormatInt(time.Now().UnixNano(), 10), nil)
+	if err != nil {
+		return nil, fmt.Errorf("preparando petición del manifiesto: %w", err)
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("descargando manifiesto: %w", err)
 	}

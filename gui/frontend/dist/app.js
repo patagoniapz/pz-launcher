@@ -143,7 +143,19 @@ async function saveSettings() {
 async function handleAction(act) {
   switch (act) {
     case "play":
-      try { await App().Play(); } catch (e) { toast(String(e), "err"); }
+      // El backend revalida los ficheros contra el manifiesto antes de lanzar;
+      // mostramos la vista de progreso para que se vea la verificación o la
+      // descarga. Si todo va bien la app se cierra sola al arrancar el juego.
+      $("stage").textContent = "Verificando ficheros…";
+      $("bar-fill").style.width = "0%";
+      $("pct").textContent = "";
+      show("view-updating");
+      try {
+        await App().Play();
+      } catch (e) {
+        show("view-menu");
+        toast(String(e), "err");
+      }
       break;
     case "quit":
       App().Quit();

@@ -76,9 +76,10 @@ func (a *App) resolveZomboidDir() (string, bool) {
 	return picked, true
 }
 
-// hasGameExe indica si dir parece la carpeta del juego (contiene su ejecutable).
+// hasGameExe indica si dir parece la carpeta del juego: contiene su ejecutable
+// (Windows/Linux) o el bundle de la app (macOS).
 func hasGameExe(dir string) bool {
-	for _, name := range []string{"ProjectZomboid64.exe", "ProjectZomboid64"} {
+	for _, name := range []string{"ProjectZomboid64.exe", "ProjectZomboid64", "Project Zomboid.app"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 			return true
 		}

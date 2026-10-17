@@ -42,6 +42,7 @@ type App struct {
 	exeDir  string
 	cfg     config.Config
 	m       *manifest.Manifest
+	url     string // URL efectiva del manifiesto (para revalidar antes de jugar)
 	gameDir string
 	offline bool
 	ready   bool
@@ -115,6 +116,9 @@ func (a *App) run() {
 	if env := os.Getenv("PZL_MANIFEST_URL"); env != "" {
 		url = env
 	}
+	a.mu.Lock()
+	a.url = url
+	a.mu.Unlock()
 
 	rep.Stage("Comprobando actualizaciones…")
 	m, ferr := manifest.Fetch(url)
@@ -203,11 +207,33 @@ func (a *App) GetState() StatePayload {
 // Play aplica los ajustes y lanza el juego vía Steam; después cierra la ventana.
 func (a *App) Play() error {
 	a.mu.Lock()
-	m, gameDir, cfg := a.m, a.gameDir, a.cfg
+	m, gameDir, cfg, url := a.m, a.gameDir, a.cfg, a.url
 	a.mu.Unlock()
 	if gameDir == "" || m == nil {
 		return fmt.Errorf("No se encontró la carpeta del juego.")
 	}
+
+	// Revalidar JUSTO antes de jugar: entre el arranque del launcher y el click
+	// en "Jugar" pudo publicarse un jar nuevo (token rotado) o algo pudo pisar
+	// los ficheros (p. ej. "verificar integridad" de Steam). Se refresca el
+	// manifiesto y se re-sincroniza por hash; si justo ahora no hay red, se
+	// lanza con lo validado al arranque (mismo espíritu que el modo offline).
+	if url != "" {
+		if fresh, err := manifest.Fetch(url); err != nil {
+			log.Printf("[aviso] no se pudo refrescar el manifiesto antes de jugar: %v", err)
+		} else {
+			rep := &wailsReporter{ctx: a.ctx}
+			rep.Stage("Verificando ficheros…")
+			if serr := updater.SyncFiles(gameDir, fresh.Files, rep); serr != nil {
+				return fmt.Errorf("Error actualizando ficheros: %w", serr)
+			}
+			m = fresh
+			a.mu.Lock()
+			a.m = fresh
+			a.mu.Unlock()
+		}
+	}
+
 	a.applyGameOpts(gameDir, cfg)
 
 	// Respaldo + limpieza de logs del cliente (best-effort; NUNCA bloquea el
