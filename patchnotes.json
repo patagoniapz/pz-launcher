@@ -1,5 +1,11 @@
 [
   {
+    "id": "C36b",
+    "title": "Actualización obligatoria: vuelve el chat del juego a Discord",
+    "desc": "Con la actualización de hoy del servidor, los clientes anteriores dejan de ser aceptados al conectar: abrí el launcher y dale a Jugar para recibir el cliente nuevo automáticamente. El arreglo es del lado del servidor: el canal de Discord que refleja el chat del juego venía mostrando solo los eventos y las muertes; ahora vuelve a verse también lo que la gente habla por /all, como antes. En el cliente no cambia nada más.",
+    "date": "2026-10-17"
+  },
+  {
     "id": "C35-C36",
     "title": "Actualización obligatoria: capacidad redonda de la Caja Patagónica + arreglo de electrodomésticos que se apagaban solos",
     "desc": "Con la actualización de hoy del servidor, los clientes anteriores dejan de ser aceptados al conectar: abrí el launcher y dale a Jugar para recibir el cliente nuevo automáticamente. Trae dos cosas: (1) La capacidad de la Caja Patagónica ahora se muestra y aplica en números redondos: 170 de base, 200 con el rasgo Organizado (tope máximo) y 110 con Desorganizado. (2) Arreglamos un bug donde hornos, heladeras y televisores a veces dejaban de funcionar pese a tener electricidad, y volvían a andar si los levantabas y los volvías a acomodar. La causa era un dato interno de la habitación que a veces no terminaba de enlazarse bien; ahora el juego lo reintenta solo. Si te pasaba esto, avisanos si vuelve a repetirse.",
