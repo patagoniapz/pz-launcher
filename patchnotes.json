@@ -1,5 +1,11 @@
 [
   {
+    "id": "C37",
+    "title": "Arreglo: error gráfico repetido por vehículos fantasma",
+    "desc": "Arreglamos un error del cliente que se disparaba sin parar (varias veces por segundo) cuando un vehículo quedaba 'fantasma' al descargarse la zona del mapa donde estaba: el juego intentaba dibujarlo igual y fallaba en cada cuadro, lo que podía causar tirones y artefactos visuales cerca de autos. Ahora esos vehículos fantasma directamente no se dibujan hasta que la zona vuelve a cargar bien. Entrá por el launcher y dale a Jugar para recibir el cliente nuevo automáticamente.",
+    "date": "2026-10-18"
+  },
+  {
     "id": "C36b",
     "title": "Actualización obligatoria: vuelve el chat del juego a Discord",
     "desc": "Con la actualización de hoy del servidor, los clientes anteriores dejan de ser aceptados al conectar: abrí el launcher y dale a Jugar para recibir el cliente nuevo automáticamente. El arreglo es del lado del servidor: el canal de Discord que refleja el chat del juego venía mostrando solo los eventos y las muertes; ahora vuelve a verse también lo que la gente habla por /all, como antes. En el cliente no cambia nada más.",
