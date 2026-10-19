@@ -2,6 +2,7 @@
 /devtest/www/
 /devtest/game/
 /devtest/fakezomboid/
+/graphify-out/
 *.old
 *.new
 *.bak
