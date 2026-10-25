@@ -1,5 +1,11 @@
 [
   {
+    "id": "C41",
+    "title": "Invierno: la nieve ya no cubre las rutas de asfalto",
+    "desc": "A partir de ahora, en invierno la nieve no se acumula sobre el asfalto: las calles y rutas pavimentadas quedan despejadas, como una ciudad donde ya pasó la máquina quitanieves. Los caminos de ripio, la tierra, el pasto y el resto del suelo SÍ se siguen cubriendo de nieve normalmente. Además, al manejar sobre asfalto despejado el auto vuelve a sonar como sobre asfalto (y no sobre nieve). Es un cambio visual del lado de tu cliente, no afecta a nadie más ni a tu partida. Entrá por el launcher y dale a Jugar para recibir el cliente nuevo.",
+    "date": "2026-10-24"
+  },
+  {
     "id": "C40",
     "title": "Nuevo (opcional): elegí tu propia dificultad de zombis",
     "desc": "Ahora podés ajustar la dificultad de los zombis para VOS, sin afectar a los demás. Entrá a Opciones → Mods → 'Dificultad de zombis (personal)' y cambiá, eje por eje: Vista (qué tan fácil te ven), Oído (qué tan lejos te escuchan), Fuerza (cuántos zombis hacen falta para tirarte al piso), Resistencia (cuántos golpes para matarlos) y Memoria (cuánto te siguen persiguiendo). Cada eje usa los mismos niveles del sandbox del servidor; 'Normal' = igual que ahora. No cambia el loot, ni la experiencia, ni da ninguna ventaja: es solo para adaptar la partida a tu gusto. La velocidad y la cantidad de zombis no se pueden personalizar (siguen siendo las del servidor). Es totalmente opcional: si no tocás nada, jugás igual que siempre. Entrá por el launcher y dale a Jugar para recibir el cliente nuevo.",
